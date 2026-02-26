@@ -270,13 +270,18 @@ async function runWatchLaterSync(options?: { manual?: boolean }): Promise<number
     throw new Error('Gemini API 키가 설정되지 않았습니다.');
   }
 
-  // 자동 실행 시에만 enabled 체크
   if (!options?.manual && !settings.watchLaterEnabled) return 0;
 
-  const hasSlack = (settings.watchLaterAutoExport === 'slack' || settings.watchLaterAutoExport === 'both')
-    && !!settings.slackWebhookUrl;
-  const hasNotion = (settings.watchLaterAutoExport === 'notion' || settings.watchLaterAutoExport === 'both')
-    && !!settings.notionToken && !!settings.notionDatabaseId;
+  // 수동: 자격증명 있으면 무조건 내보내기 / 자동: watchLaterAutoExport 설정 따름
+  const slackConfigured = !!settings.slackWebhookUrl;
+  const notionConfigured = !!settings.notionToken && !!settings.notionDatabaseId;
+
+  const shouldSlack = options?.manual
+    ? slackConfigured
+    : (settings.watchLaterAutoExport === 'slack' || settings.watchLaterAutoExport === 'both') && slackConfigured;
+  const shouldNotion = options?.manual
+    ? notionConfigured
+    : (settings.watchLaterAutoExport === 'notion' || settings.watchLaterAutoExport === 'both') && notionConfigured;
 
   const wlState = await getWatchLaterState();
   const videos = await fetchWatchLaterVideos();
@@ -295,11 +300,13 @@ async function runWatchLaterSync(options?: { manual?: boolean }): Promise<number
   if (newVideos.length === 0) return 0;
 
   let processed = 0;
+  let slackOk = 0;
+  let notionOk = 0;
+  let slackFail = 0;
+  let notionFail = 0;
 
   for (const video of newVideos) {
-    if (!canMakeRequest(wlState)) {
-      break;
-    }
+    if (!canMakeRequest(wlState)) break;
 
     try {
       const content: ExtractedContent = {
@@ -334,17 +341,28 @@ async function runWatchLaterSync(options?: { manual?: boolean }): Promise<number
       };
       await addToHistory(historyItem);
 
-      if (hasSlack) {
-        await exportToSlack(historyItem, settings.slackWebhookUrl).catch(() => {});
+      if (shouldSlack) {
+        try {
+          await exportToSlack(historyItem, settings.slackWebhookUrl);
+          slackOk++;
+        } catch (e) {
+          slackFail++;
+          console.error('[See You Later] Slack export failed:', e);
+        }
       }
-      if (hasNotion) {
-        await exportToNotion(historyItem, settings.notionToken, settings.notionDatabaseId).catch(() => {});
+      if (shouldNotion) {
+        try {
+          await exportToNotion(historyItem, settings.notionToken, settings.notionDatabaseId);
+          notionOk++;
+        } catch (e) {
+          notionFail++;
+          console.error('[See You Later] Notion export failed:', e);
+        }
       }
 
       wlState.processedVideoIds.push(video.videoId);
       processed++;
 
-      // Rate limiting: 분당 10회 한도 준수를 위해 6초 대기
       await new Promise((r) => setTimeout(r, 6500));
     } catch {
       continue;
@@ -352,19 +370,35 @@ async function runWatchLaterSync(options?: { manual?: boolean }): Promise<number
   }
 
   wlState.lastCheckedAt = Date.now();
-  // 최근 500개만 유지하여 스토리지 절약
   if (wlState.processedVideoIds.length > 500) {
     wlState.processedVideoIds = wlState.processedVideoIds.slice(-500);
   }
   await saveWatchLaterState(wlState);
 
   if (processed > 0) {
-    const target = hasSlack && hasNotion ? 'Slack과 Notion' : hasSlack ? 'Slack' : 'Notion';
+    const parts: string[] = [];
+    if (slackOk > 0) parts.push('Slack');
+    if (notionOk > 0) parts.push('Notion');
+
+    const failParts: string[] = [];
+    if (slackFail > 0) failParts.push(`Slack ${slackFail}건 실패`);
+    if (notionFail > 0) failParts.push(`Notion ${notionFail}건 실패`);
+
+    let message = `${processed}개 영상 요약 완료.`;
+    if (parts.length > 0) {
+      message += ` ${parts.join(' + ')}으로 전송됨.`;
+    } else if (!shouldSlack && !shouldNotion) {
+      message += ' 히스토리에 저장됨 (내보내기 대상 없음).';
+    }
+    if (failParts.length > 0) {
+      message += ` [${failParts.join(', ')}]`;
+    }
+
     chrome.notifications.create({
       type: 'basic',
       iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
       title: 'See You Later',
-      message: `${processed}개의 새 영상 요약이 ${target}으로 전송되었습니다.`,
+      message,
     });
   }
 
