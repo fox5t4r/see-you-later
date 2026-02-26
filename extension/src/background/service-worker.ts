@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === WATCH_LATER_ALARM) {
-    runWatchLaterSync().catch((err) => {
+    runWatchLaterSync({ manual: false }).catch((err) => {
       console.error('Watch Later sync failed:', err);
     });
   }
@@ -127,7 +127,8 @@ async function handleMessage(
       }
 
       case 'SYNC_WATCH_LATER': {
-        runWatchLaterSync()
+        // 수동 동기화: watchLaterAutoExport 설정과 무관하게 실행
+        runWatchLaterSync({ manual: true })
           .then((count) => sendResponse({ success: true, data: { count } }))
           .catch((err) => sendResponse({ success: false, error: err.message }));
         return;
@@ -262,22 +263,30 @@ async function handleSummarize(content: ExtractedContent, mode: SummaryMode) {
   return { result, historyItem };
 }
 
-async function runWatchLaterSync(): Promise<number> {
+async function runWatchLaterSync(options?: { manual?: boolean }): Promise<number> {
   const settings = await getSettings();
 
-  if (!settings.watchLaterEnabled || !settings.geminiApiKey) return 0;
-  if (settings.watchLaterAutoExport === 'none') return 0;
+  if (!settings.geminiApiKey) {
+    throw new Error('Gemini API 키가 설정되지 않았습니다.');
+  }
 
-  const hasSlack = settings.watchLaterAutoExport !== 'notion' && !!settings.slackWebhookUrl;
-  const hasNotion = settings.watchLaterAutoExport !== 'slack'
+  // 자동 실행 시에만 enabled 체크
+  if (!options?.manual && !settings.watchLaterEnabled) return 0;
+
+  const hasSlack = (settings.watchLaterAutoExport === 'slack' || settings.watchLaterAutoExport === 'both')
+    && !!settings.slackWebhookUrl;
+  const hasNotion = (settings.watchLaterAutoExport === 'notion' || settings.watchLaterAutoExport === 'both')
     && !!settings.notionToken && !!settings.notionDatabaseId;
-
-  if (!hasSlack && !hasNotion) return 0;
 
   const wlState = await getWatchLaterState();
   const videos = await fetchWatchLaterVideos();
 
-  if (videos.length === 0) return 0;
+  if (videos.length === 0) {
+    throw new Error(
+      'Watch Later 목록을 가져올 수 없습니다.\n' +
+      'YouTube에 로그인되어 있는지 확인하고, YouTube 탭이 열려 있으면 새로고침 후 다시 시도해주세요.',
+    );
+  }
 
   const newVideos = wlState.processedVideoIds.length === 0
     ? videos

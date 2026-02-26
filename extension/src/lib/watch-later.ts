@@ -3,6 +3,7 @@ import { DEFAULT_WATCH_LATER_STATE } from '@/types';
 
 const WL_STATE_KEY = 'syl_watch_later';
 const DAILY_LIMIT = 240;
+const WL_URL = 'https://www.youtube.com/playlist?list=WL';
 
 export interface WatchLaterVideo {
   videoId: string;
@@ -37,39 +38,115 @@ export function canMakeRequest(state: WatchLaterState): boolean {
 }
 
 /**
- * YouTube Watch Later 페이지를 fetch하여 영상 목록 추출.
- * 서비스 워커에서 credentials: 'include'로 YouTube 쿠키를 포함하여 요청합니다.
+ * YouTube Watch Later 목록을 가져옵니다.
+ *
+ * 서비스 워커에서 fetch()는 브라우저 쿠키 컨텍스트가 없어 항상 로그아웃 상태로 요청됩니다.
+ * 대신 chrome.scripting으로 YouTube 탭에 스크립트를 주입하여 로그인 상태에서 직접 추출합니다.
+ * YouTube 탭이 없으면 백그라운드 탭을 열어 처리 후 닫습니다.
  */
 export async function fetchWatchLaterVideos(): Promise<WatchLaterVideo[]> {
+  let tabId: number | null = null;
+  let createdTab = false;
+
   try {
-    const response = await fetch('https://www.youtube.com/playlist?list=WL', {
-      credentials: 'include',
-      headers: {
-        'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
-      },
+    // 이미 열려 있는 YouTube WL 탭 찾기
+    const existingTabs = await chrome.tabs.query({ url: '*://www.youtube.com/playlist?list=WL*' });
+    if (existingTabs.length > 0 && existingTabs[0].id != null) {
+      tabId = existingTabs[0].id;
+    } else {
+      // 백그라운드 탭 생성
+      const tab = await chrome.tabs.create({ url: WL_URL, active: false });
+      tabId = tab.id ?? null;
+      createdTab = true;
+
+      if (tabId == null) return [];
+
+      // 페이지 로드 완료 대기
+      await waitForTabLoad(tabId);
+    }
+
+    // 탭에서 ytInitialData 추출
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: extractWatchLaterFromPage,
     });
 
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    return parseWatchLaterHtml(html);
-  } catch {
+    const videos = results?.[0]?.result as WatchLaterVideo[] | null;
+    return videos ?? [];
+  } catch (err) {
+    console.error('[See You Later] Watch Later fetch failed:', err);
     return [];
+  } finally {
+    if (createdTab && tabId != null) {
+      chrome.tabs.remove(tabId).catch(() => {});
+    }
   }
 }
 
-function parseWatchLaterHtml(html: string): WatchLaterVideo[] {
-  const videos: WatchLaterVideo[] = [];
+function waitForTabLoad(tabId: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    }, 10000);
 
-  // ytInitialData에서 playlist 영상 목록 추출
-  const dataMatch = html.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s);
-  if (!dataMatch) return videos;
+    function listener(id: number, info: chrome.tabs.TabChangeInfo) {
+      if (id === tabId && info.status === 'complete') {
+        clearTimeout(timeout);
+        chrome.tabs.onUpdated.removeListener(listener);
+        // DOM이 완전히 렌더링될 시간 추가 대기
+        setTimeout(resolve, 1500);
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+/**
+ * YouTube 탭 내부에서 실행되는 함수 — ytInitialData에서 Watch Later 목록 파싱
+ * chrome.scripting.executeScript의 func으로 전달되므로 클로저 사용 불가
+ */
+function extractWatchLaterFromPage(): Array<{ videoId: string; title: string }> {
+  const videos: Array<{ videoId: string; title: string }> = [];
 
   try {
-    const data = JSON.parse(dataMatch[1]);
+    // window.ytInitialData가 이미 파싱된 객체로 존재
+    const data = (window as unknown as { ytInitialData?: unknown }).ytInitialData;
+    if (!data) return videos;
 
+    type YTData = {
+      contents?: {
+        twoColumnBrowseResultsRenderer?: {
+          tabs?: Array<{
+            tabRenderer?: {
+              content?: {
+                sectionListRenderer?: {
+                  contents?: Array<{
+                    itemSectionRenderer?: {
+                      contents?: Array<{
+                        playlistVideoListRenderer?: {
+                          contents?: Array<{
+                            playlistVideoRenderer?: {
+                              videoId?: string;
+                              title?: { runs?: Array<{ text?: string }>; simpleText?: string };
+                            };
+                          }>;
+                        };
+                      }>;
+                    };
+                  }>;
+                };
+              };
+            };
+          }>;
+        };
+      };
+    };
+
+    const typedData = data as YTData;
     const contents =
-      data?.contents
+      typedData?.contents
         ?.twoColumnBrowseResultsRenderer
         ?.tabs?.[0]
         ?.tabRenderer
@@ -85,20 +162,17 @@ function parseWatchLaterHtml(html: string): WatchLaterVideo[] {
 
     for (const item of contents) {
       const renderer = item?.playlistVideoRenderer;
-      if (!renderer) continue;
+      if (!renderer?.videoId) continue;
 
-      const videoId = renderer.videoId;
       const title =
         renderer.title?.runs?.[0]?.text
         ?? renderer.title?.simpleText
         ?? '제목 없음';
 
-      if (videoId && typeof videoId === 'string') {
-        videos.push({ videoId, title });
-      }
+      videos.push({ videoId: renderer.videoId, title });
     }
   } catch {
-    return videos;
+    // 파싱 실패 시 빈 배열 반환
   }
 
   return videos;
