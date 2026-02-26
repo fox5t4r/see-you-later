@@ -9,26 +9,19 @@
 
 ## [Unreleased]
 
-### Added
-- Watch Later 자동 요약 기능 (chrome.alarms 기반 주기적 체크)
-- Watch Later 영상 감지 모듈 (YouTube 페이지 HTML 파싱)
-- 배치 요약 → Slack/Notion 자동 내보내기
-- 온보딩 플로우 (API 키 미설정 시 발급 가이드 표시)
-- Watch Later 설정 UI (활성화 토글, 주기, 내보내기 대상)
-- "지금 동기화" 수동 트리거 버튼
+---
+
+## [0.1.1] - 2026-02-26
+
+### Fixed
+- **Slack 내보내기**: 추천 대상(bestFor), 스킵 대상(skipIf), 직접 시청/전문 읽기 권장 정보가 전송되지 않던 문제 수정
+- **Notion 에러 토스트**: 긴 에러 메시지가 토스트 창보다 커지던 UI 오버플로우 수정 (pill → rounded-xl, 전체 너비 레이아웃)
+- **Notion 에러 메시지**: 403 권한 오류 안내 문구를 간결하게 개선
+- **"나중에 볼 동영상" 파싱**: YouTube `ytInitialData` 구조 변경에 대응하는 재귀 탐색 방식으로 강화
 
 ### Changed
-- **AI 엔진 교체**: Claude Haiku 4.5 → Gemini 2.5 Flash (무료 티어 지원)
-- **YouTube 자막 없는 영상 처리**: Whisper + yt-dlp → Gemini YouTube URL 직접 처리
-- **설정 UI**: Anthropic/OpenAI API 키 → Gemini API 키 단일화
-- UX 단순화: needs_whisper 상태 및 Whisper 확인 다이얼로그 제거
-
-### Removed
-- Docker 백엔드 (FastAPI + yt-dlp + Whisper) 전체 제거
-- `docker-compose.yml` 제거
-- `extension/src/lib/claude.ts` 제거
-- `extension/src/lib/whisper-client.ts` 제거
-- Settings에서 `anthropicApiKey`, `openaiApiKey`, `backendUrl` 필드 제거
+- 설정 화면 "Watch Later 자동 요약" → **"나중에 볼 동영상" 자동 요약** 으로 텍스트 변경
+- Watch Later 목록 가져오기 실패 에러 메시지 한국어화
 
 ---
 

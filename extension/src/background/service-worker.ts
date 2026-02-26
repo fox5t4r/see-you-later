@@ -283,7 +283,7 @@ async function runWatchLaterSync(options?: { manual?: boolean }): Promise<number
 
   if (videos.length === 0) {
     throw new Error(
-      'Watch Later 목록을 가져올 수 없습니다.\n' +
+      '"나중에 볼 동영상" 목록을 가져올 수 없습니다.\n' +
       'YouTube에 로그인되어 있는지 확인하고, YouTube 탭이 열려 있으면 새로고침 후 다시 시도해주세요.',
     );
   }

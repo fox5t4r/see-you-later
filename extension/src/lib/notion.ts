@@ -47,8 +47,8 @@ export async function exportToNotion(
 
     if (response.status === 403 || error.code === 'restricted_resource') {
       throw new Error(
-        'Notion 접근 권한이 없습니다.\n' +
-        '해당 페이지/데이터베이스에서 연동(Connections)에 See You Later Integration을 추가해주세요.',
+        'Notion 접근 권한 없음\n' +
+        '저장할 페이지 우측 상단 ··· → Connections → Integration 선택',
       );
     }
     if (response.status === 404) {

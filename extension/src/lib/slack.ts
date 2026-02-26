@@ -32,8 +32,40 @@ export async function exportToSlack(item: HistoryItem, webhookUrl: string): Prom
       type: 'section',
       text: { type: 'mrkdwn', text: `*추천 이유:* ${result.recommendation.reason}` },
     },
-    { type: 'divider' },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*✅ 추천 대상:* ${result.recommendation.bestFor}` },
+        { type: 'mrkdwn', text: `*⏭️ 스킵 대상:* ${result.recommendation.skipIf}` },
+      ],
+    },
   ];
+
+  // 유튜브: 직접 시청 권장 여부
+  if ('worthWatching' in result.recommendation && result.recommendation.worthWatching !== undefined) {
+    const label = result.recommendation.worthWatching ? '🎬 직접 시청 권장' : '📄 요약으로 충분';
+    const reason = result.recommendation.worthWatchingReason
+      ? `: ${result.recommendation.worthWatchingReason}`
+      : '';
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${label}*${reason}` },
+    });
+  }
+
+  // 웹 페이지: 전문 읽기 권장 여부
+  if ('worthFullRead' in result.recommendation && result.recommendation.worthFullRead !== undefined) {
+    const label = result.recommendation.worthFullRead ? '📖 전문 읽기 권장' : '📄 요약으로 충분';
+    const reason = result.recommendation.worthFullReadReason
+      ? `: ${result.recommendation.worthFullReadReason}`
+      : '';
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${label}*${reason}` },
+    });
+  }
+
+  blocks.push({ type: 'divider' });
 
   if (result.mode === 'learn') {
     // 학습 모드: 핵심 개념 + 배울 점 + 실제 적용

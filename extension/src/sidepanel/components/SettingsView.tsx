@@ -143,7 +143,7 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
 
       {/* Watch Later 자동 요약 */}
       <section className="space-y-3">
-        <h3 className="font-semibold text-sm text-gray-700">Watch Later 자동 요약</h3>
+        <h3 className="font-semibold text-sm text-gray-700">"나중에 볼 동영상" 자동 요약</h3>
 
         <label className="flex items-center gap-3 cursor-pointer">
           <div className="relative">

@@ -106,71 +106,53 @@ function waitForTabLoad(tabId: number): Promise<void> {
 /**
  * YouTube 탭 내부에서 실행되는 함수 — ytInitialData에서 Watch Later 목록 파싱
  * chrome.scripting.executeScript의 func으로 전달되므로 클로저 사용 불가
+ * YouTube의 내부 구조는 자주 변경되므로 여러 경로를 순서대로 시도
  */
 function extractWatchLaterFromPage(): Array<{ videoId: string; title: string }> {
   const videos: Array<{ videoId: string; title: string }> = [];
 
   try {
-    // window.ytInitialData가 이미 파싱된 객체로 존재
     const data = (window as unknown as { ytInitialData?: unknown }).ytInitialData;
     if (!data) return videos;
 
-    type YTData = {
-      contents?: {
-        twoColumnBrowseResultsRenderer?: {
-          tabs?: Array<{
-            tabRenderer?: {
-              content?: {
-                sectionListRenderer?: {
-                  contents?: Array<{
-                    itemSectionRenderer?: {
-                      contents?: Array<{
-                        playlistVideoListRenderer?: {
-                          contents?: Array<{
-                            playlistVideoRenderer?: {
-                              videoId?: string;
-                              title?: { runs?: Array<{ text?: string }>; simpleText?: string };
-                            };
-                          }>;
-                        };
-                      }>;
-                    };
-                  }>;
-                };
-              };
-            };
-          }>;
-        };
-      };
-    };
+    // playlistVideoRenderer를 재귀적으로 찾아 videoId와 title 추출
+    function findVideoRenderers(obj: unknown): Array<{ videoId: string; title: string }> {
+      const found: Array<{ videoId: string; title: string }> = [];
+      if (!obj || typeof obj !== 'object') return found;
 
-    const typedData = data as YTData;
-    const contents =
-      typedData?.contents
-        ?.twoColumnBrowseResultsRenderer
-        ?.tabs?.[0]
-        ?.tabRenderer
-        ?.content
-        ?.sectionListRenderer
-        ?.contents?.[0]
-        ?.itemSectionRenderer
-        ?.contents?.[0]
-        ?.playlistVideoListRenderer
-        ?.contents;
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          found.push(...findVideoRenderers(item));
+        }
+        return found;
+      }
 
-    if (!Array.isArray(contents)) return videos;
+      const record = obj as Record<string, unknown>;
 
-    for (const item of contents) {
-      const renderer = item?.playlistVideoRenderer;
-      if (!renderer?.videoId) continue;
+      if (record['playlistVideoRenderer']) {
+        const renderer = record['playlistVideoRenderer'] as Record<string, unknown>;
+        const videoId = renderer['videoId'] as string | undefined;
+        if (videoId) {
+          const titleObj = renderer['title'] as Record<string, unknown> | undefined;
+          const runs = titleObj?.['runs'] as Array<{ text?: string }> | undefined;
+          const simpleText = titleObj?.['simpleText'] as string | undefined;
+          const title = runs?.[0]?.text ?? simpleText ?? '제목 없음';
+          found.push({ videoId, title });
+          return found;
+        }
+      }
 
-      const title =
-        renderer.title?.runs?.[0]?.text
-        ?? renderer.title?.simpleText
-        ?? '제목 없음';
+      for (const key of Object.keys(record)) {
+        // 불필요한 깊은 탐색 방지 (thumbnails, playerOverlays 등)
+        if (key === 'thumbnail' || key === 'playerOverlays' || key === 'engagementPanels') continue;
+        found.push(...findVideoRenderers(record[key]));
+      }
 
-      videos.push({ videoId: renderer.videoId, title });
+      return found;
     }
+
+    const found = findVideoRenderers(data);
+    videos.push(...found);
   } catch {
     // 파싱 실패 시 빈 배열 반환
   }
