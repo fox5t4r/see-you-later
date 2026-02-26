@@ -199,9 +199,9 @@ function SummarizeTab({
     return (
       <div className="p-4 space-y-4">
         <div className="card p-6 text-center space-y-4">
-          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-            <div className="w-6 h-6 border-2 border-gray-400 rounded-sm" />
-          </div>
+          <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto">
+              <div className="w-5 h-5 bg-white rounded-full animate-pulse-fast" />
+            </div>
           <div>
             <h3 className="font-bold text-sm text-gray-900 mb-1">시작하기</h3>
             <p className="text-xs text-gray-500 leading-relaxed">

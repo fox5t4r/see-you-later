@@ -8,13 +8,13 @@ interface HistoryListProps {
   onCopyMarkdown: (item: HistoryItem) => void;
 }
 
-type FilterKey = 'learn' | 'summary' | 'youtube' | 'web';
+type FilterKey = 'learn' | 'summary' | 'youtube' | 'webpage';
 
 const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
   { key: 'learn', label: '학습 모드' },
   { key: 'summary', label: '일반 모드' },
   { key: 'youtube', label: '유튜브' },
-  { key: 'web', label: '웹 페이지' },
+  { key: 'webpage', label: '웹 페이지' },
 ];
 
 export default function HistoryList({
@@ -90,10 +90,10 @@ export default function HistoryList({
       (activeFilters.has('summary') && item.result.mode === 'summary');
     const typeMatch =
       (activeFilters.has('youtube') && item.contentType === 'youtube') ||
-      (activeFilters.has('web') && item.contentType === 'web');
+      (activeFilters.has('webpage') && item.contentType === 'webpage');
 
     const hasModeFilter = activeFilters.has('learn') || activeFilters.has('summary');
-    const hasTypeFilter = activeFilters.has('youtube') || activeFilters.has('web');
+    const hasTypeFilter = activeFilters.has('youtube') || activeFilters.has('webpage');
 
     if (hasModeFilter && hasTypeFilter) return modeMatch && typeMatch;
     if (hasModeFilter) return modeMatch;
@@ -215,24 +215,29 @@ export default function HistoryList({
           </div>
         ) : (
           filteredHistory.map((item) => (
-            <div key={item.id} className="relative">
+            <div
+              key={item.id}
+              className={`flex items-start gap-2 ${isSelectMode ? 'cursor-pointer' : ''}`}
+              onClick={isSelectMode ? () => toggleSelect(item.id) : undefined}
+            >
               {isSelectMode && (
-                <button
-                  onClick={() => toggleSelect(item.id)}
-                  className={`absolute top-3 right-3 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                    selectedIds.has(item.id)
-                      ? 'bg-gray-900 border-gray-900'
-                      : 'bg-white border-gray-300'
-                  }`}
-                >
-                  {selectedIds.has(item.id) && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
+                <div className="flex-shrink-0 mt-3.5 ml-0.5">
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedIds.has(item.id)
+                        ? 'bg-gray-900 border-gray-900'
+                        : 'bg-white border-gray-300'
+                    }`}
+                  >
+                    {selectedIds.has(item.id) && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
               )}
-              <div className={isSelectMode ? 'pointer-events-none opacity-90' : ''}>
+              <div className={`flex-1 min-w-0 ${isSelectMode ? 'pointer-events-none' : ''}`}>
                 <SummaryCard
                   item={item}
                   onExportNotion={onExportNotion}
