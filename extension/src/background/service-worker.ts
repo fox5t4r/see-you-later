@@ -1,18 +1,26 @@
-import { summarize } from '@/lib/claude';
+import { summarize, summarizeYouTubeByUrl } from '@/lib/gemini';
 import { getSettings, addToHistory, saveSettings, getHistory, clearHistory } from '@/lib/storage';
 import { fetchTranscript, segmentsToText } from '@/lib/youtube';
-import { transcribeVideo } from '@/lib/whisper-client';
 import { exportToNotion } from '@/lib/notion';
 import { exportToSlack } from '@/lib/slack';
+import {
+  fetchWatchLaterVideos,
+  getWatchLaterState,
+  saveWatchLaterState,
+  trackDailyUsage,
+  canMakeRequest,
+} from '@/lib/watch-later';
 import type {
   Message,
   ExtractedContent,
   SummaryMode,
   HistoryItem,
+  Settings,
 } from '@/types';
 
 const BLOCKED_PREFIXES = ['chrome://', 'chrome-extension://', 'about:', 'edge://', 'devtools://'];
 const BLOCKED_HOSTS = ['accounts.google.com', 'chromewebstore.google.com', 'chrome.google.com'];
+const WATCH_LATER_ALARM = 'watch-later-sync';
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
@@ -20,6 +28,33 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
   handleMessage(message, sendResponse);
   return true;
 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === WATCH_LATER_ALARM) {
+    runWatchLaterSync().catch((err) => {
+      console.error('Watch Later sync failed:', err);
+    });
+  }
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  setupWatchLaterAlarm();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  setupWatchLaterAlarm();
+});
+
+async function setupWatchLaterAlarm() {
+  const settings = await getSettings();
+  await chrome.alarms.clear(WATCH_LATER_ALARM);
+
+  if (settings.watchLaterEnabled) {
+    chrome.alarms.create(WATCH_LATER_ALARM, {
+      periodInMinutes: settings.watchLaterInterval,
+    });
+  }
+}
 
 async function handleMessage(
   message: Message,
@@ -41,18 +76,6 @@ async function handleMessage(
         break;
       }
 
-      case 'WHISPER_TRANSCRIBE': {
-        const { videoId } = message.payload as { videoId: string };
-        const settings = await getSettings();
-        if (!settings.backendUrl) {
-          sendResponse({ success: false, error: '백엔드 URL이 설정되지 않았습니다.' });
-          break;
-        }
-        const transcribeResult = await transcribeVideo(videoId, settings.backendUrl);
-        sendResponse({ success: true, data: transcribeResult });
-        break;
-      }
-
       case 'GET_SETTINGS': {
         const settings = await getSettings();
         sendResponse({ success: true, data: settings });
@@ -60,7 +83,9 @@ async function handleMessage(
       }
 
       case 'SAVE_SETTINGS': {
-        await saveSettings(message.payload as Parameters<typeof saveSettings>[0]);
+        const newSettings = message.payload as Partial<Settings>;
+        await saveSettings(newSettings);
+        await setupWatchLaterAlarm();
         sendResponse({ success: true });
         break;
       }
@@ -98,6 +123,19 @@ async function handleMessage(
         }
         await exportToSlack(item, settings.slackWebhookUrl);
         sendResponse({ success: true });
+        break;
+      }
+
+      case 'SYNC_WATCH_LATER': {
+        runWatchLaterSync()
+          .then((count) => sendResponse({ success: true, data: { count } }))
+          .catch((err) => sendResponse({ success: false, error: err.message }));
+        return;
+      }
+
+      case 'GET_WATCH_LATER_STATUS': {
+        const wlState = await getWatchLaterState();
+        sendResponse({ success: true, data: wlState });
         break;
       }
 
@@ -175,8 +213,8 @@ async function handleExtractAndSummarize(mode: SummaryMode) {
 async function handleSummarize(content: ExtractedContent, mode: SummaryMode) {
   const settings = await getSettings();
 
-  if (!settings.anthropicApiKey) {
-    throw new Error('Anthropic API 키가 설정되지 않았습니다. 설정 탭에서 입력해주세요.');
+  if (!settings.geminiApiKey) {
+    throw new Error('Gemini API 키가 설정되지 않았습니다. 설정 탭에서 입력해주세요.');
   }
 
   let finalContent = content;
@@ -190,11 +228,25 @@ async function handleSummarize(content: ExtractedContent, mode: SummaryMode) {
         hasSubtitles: true,
       };
     } else {
-      return { needsWhisper: true, videoId: content.videoId };
+      await trackDailyUsage();
+      const result = await summarizeYouTubeByUrl(content, mode, settings.geminiApiKey);
+
+      const historyItem: HistoryItem = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        url: content.url,
+        title: content.title,
+        contentType: content.type,
+        mode,
+        result,
+        createdAt: Date.now(),
+      };
+      await addToHistory(historyItem);
+      return { result, historyItem };
     }
   }
 
-  const result = await summarize(finalContent, mode, settings.anthropicApiKey);
+  await trackDailyUsage();
+  const result = await summarize(finalContent, mode, settings.geminiApiKey);
 
   const historyItem: HistoryItem = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -208,4 +260,104 @@ async function handleSummarize(content: ExtractedContent, mode: SummaryMode) {
   await addToHistory(historyItem);
 
   return { result, historyItem };
+}
+
+async function runWatchLaterSync(): Promise<number> {
+  const settings = await getSettings();
+
+  if (!settings.watchLaterEnabled || !settings.geminiApiKey) return 0;
+  if (settings.watchLaterAutoExport === 'none') return 0;
+
+  const hasSlack = settings.watchLaterAutoExport !== 'notion' && !!settings.slackWebhookUrl;
+  const hasNotion = settings.watchLaterAutoExport !== 'slack'
+    && !!settings.notionToken && !!settings.notionDatabaseId;
+
+  if (!hasSlack && !hasNotion) return 0;
+
+  const wlState = await getWatchLaterState();
+  const videos = await fetchWatchLaterVideos();
+
+  if (videos.length === 0) return 0;
+
+  const newVideos = wlState.processedVideoIds.length === 0
+    ? videos
+    : videos.filter((v) => !wlState.processedVideoIds.includes(v.videoId));
+
+  if (newVideos.length === 0) return 0;
+
+  let processed = 0;
+
+  for (const video of newVideos) {
+    if (!canMakeRequest(wlState)) {
+      break;
+    }
+
+    try {
+      const content: ExtractedContent = {
+        type: 'youtube',
+        title: video.title,
+        text: '',
+        url: `https://www.youtube.com/watch?v=${video.videoId}`,
+        videoId: video.videoId,
+      };
+
+      const transcriptResult = await fetchTranscript(video.videoId);
+      let result;
+
+      if (transcriptResult && transcriptResult.segments.length > 0) {
+        content.text = segmentsToText(transcriptResult.segments);
+        content.hasSubtitles = true;
+        result = await summarize(content, settings.defaultMode, settings.geminiApiKey);
+      } else {
+        result = await summarizeYouTubeByUrl(content, settings.defaultMode, settings.geminiApiKey);
+      }
+
+      await trackDailyUsage();
+
+      const historyItem: HistoryItem = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        url: content.url,
+        title: video.title,
+        contentType: 'youtube',
+        mode: settings.defaultMode,
+        result,
+        createdAt: Date.now(),
+      };
+      await addToHistory(historyItem);
+
+      if (hasSlack) {
+        await exportToSlack(historyItem, settings.slackWebhookUrl).catch(() => {});
+      }
+      if (hasNotion) {
+        await exportToNotion(historyItem, settings.notionToken, settings.notionDatabaseId).catch(() => {});
+      }
+
+      wlState.processedVideoIds.push(video.videoId);
+      processed++;
+
+      // Rate limiting: 분당 10회 한도 준수를 위해 6초 대기
+      await new Promise((r) => setTimeout(r, 6500));
+    } catch {
+      continue;
+    }
+  }
+
+  wlState.lastCheckedAt = Date.now();
+  // 최근 500개만 유지하여 스토리지 절약
+  if (wlState.processedVideoIds.length > 500) {
+    wlState.processedVideoIds = wlState.processedVideoIds.slice(-500);
+  }
+  await saveWatchLaterState(wlState);
+
+  if (processed > 0) {
+    const target = hasSlack && hasNotion ? 'Slack과 Notion' : hasSlack ? 'Slack' : 'Notion';
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+      title: 'See You Later',
+      message: `${processed}개의 새 영상 요약이 ${target}으로 전송되었습니다.`,
+    });
+  }
+
+  return processed;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { SummaryMode, HistoryItem, ExtractedContent } from '@/types';
+import type { SummaryMode, HistoryItem } from '@/types';
 import SummaryCard from './components/SummaryCard';
 import SettingsView from './components/SettingsView';
 import HistoryList from './components/HistoryList';
@@ -9,7 +9,6 @@ type Tab = 'summarize' | 'history' | 'settings';
 type SummarizeState =
   | { status: 'idle' }
   | { status: 'loading'; message: string }
-  | { status: 'needs_whisper'; videoId: string }
   | { status: 'success'; item: HistoryItem }
   | { status: 'error'; message: string };
 
@@ -34,10 +33,12 @@ export default function App() {
   const [mode, setMode] = useState<SummaryMode>('summary');
   const [state, setState] = useState<SummarizeState>({ status: 'idle' });
   const [toast, setToast] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
 
   useEffect(() => {
-    sendMsg<{ defaultMode?: SummaryMode }>({ type: 'GET_SETTINGS' }).then((data) => {
+    sendMsg<{ defaultMode?: SummaryMode; geminiApiKey?: string }>({ type: 'GET_SETTINGS' }).then((data) => {
       if (data?.defaultMode) setMode(data.defaultMode);
+      setHasApiKey(!!data?.geminiApiKey);
     }).catch(() => {});
   }, []);
 
@@ -53,14 +54,7 @@ export default function App() {
       const data = await sendMsg<{
         result?: unknown;
         historyItem?: HistoryItem;
-        needsWhisper?: boolean;
-        videoId?: string;
       }>({ type: 'EXTRACT_AND_SUMMARIZE', payload: { mode } });
-
-      if (data?.needsWhisper && data.videoId) {
-        setState({ status: 'needs_whisper', videoId: data.videoId });
-        return;
-      }
 
       if (data?.historyItem) {
         setState({ status: 'success', item: data.historyItem });
@@ -74,47 +68,6 @@ export default function App() {
       });
     }
   }, [mode]);
-
-  const handleWhisperConfirm = useCallback(
-    async (videoId: string) => {
-      setState({ status: 'loading', message: '음성을 텍스트로 변환하는 중... (1~3분 소요)' });
-
-      try {
-        const transcribeData = await sendMsg<{ transcript: string }>({
-          type: 'WHISPER_TRANSCRIBE',
-          payload: { videoId },
-        });
-
-        setState({ status: 'loading', message: 'AI가 요약하는 중...' });
-
-        const content: ExtractedContent = {
-          type: 'youtube',
-          title: '유튜브 영상',
-          text: transcribeData?.transcript ?? '',
-          url: `https://www.youtube.com/watch?v=${videoId}`,
-          videoId,
-          hasSubtitles: false,
-        };
-
-        const data = await sendMsg<{ historyItem?: HistoryItem }>({
-          type: 'SUMMARIZE',
-          payload: { content, mode },
-        });
-
-        if (data?.historyItem) {
-          setState({ status: 'success', item: data.historyItem });
-        } else {
-          setState({ status: 'error', message: '요약 결과를 받지 못했습니다.' });
-        }
-      } catch (error) {
-        setState({
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Whisper 변환 중 오류가 발생했습니다.',
-        });
-      }
-    },
-    [mode],
-  );
 
   const handleExportNotion = (item: HistoryItem) => {
     sendMsg<{ url: string }>({ type: 'EXPORT_NOTION', payload: { item } })
@@ -136,6 +89,13 @@ export default function App() {
     navigator.clipboard.writeText(markdown).then(() => {
       showToast('마크다운으로 복사됐습니다!');
     });
+  };
+
+  const handleSettingsSaved = () => {
+    sendMsg<{ geminiApiKey?: string }>({ type: 'GET_SETTINGS' }).then((data) => {
+      setHasApiKey(!!data?.geminiApiKey);
+    }).catch(() => {});
+    setActiveTab('summarize');
   };
 
   return (
@@ -178,13 +138,14 @@ export default function App() {
           <SummarizeTab
             mode={mode}
             state={state}
+            hasApiKey={hasApiKey}
             onModeChange={setMode}
             onSummarize={handleSummarize}
-            onWhisperConfirm={handleWhisperConfirm}
             onRetry={() => setState({ status: 'idle' })}
             onExportNotion={handleExportNotion}
             onExportSlack={handleExportSlack}
             onCopyMarkdown={handleCopyMarkdown}
+            onGoToSettings={() => setActiveTab('settings')}
           />
         )}
         {activeTab === 'history' && (
@@ -195,7 +156,7 @@ export default function App() {
           />
         )}
         {activeTab === 'settings' && (
-          <SettingsView onSaved={() => setActiveTab('summarize')} />
+          <SettingsView onSaved={handleSettingsSaved} />
         )}
       </main>
 
@@ -211,26 +172,47 @@ export default function App() {
 interface SummarizeTabProps {
   mode: SummaryMode;
   state: SummarizeState;
+  hasApiKey: boolean | null;
   onModeChange: (mode: SummaryMode) => void;
   onSummarize: () => void;
-  onWhisperConfirm: (videoId: string) => void;
   onRetry: () => void;
   onExportNotion: (item: HistoryItem) => void;
   onExportSlack: (item: HistoryItem) => void;
   onCopyMarkdown: (item: HistoryItem) => void;
+  onGoToSettings: () => void;
 }
 
 function SummarizeTab({
   mode,
   state,
+  hasApiKey,
   onModeChange,
   onSummarize,
-  onWhisperConfirm,
   onRetry,
   onExportNotion,
   onExportSlack,
   onCopyMarkdown,
+  onGoToSettings,
 }: SummarizeTabProps) {
+  if (hasApiKey === false) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="card p-5 text-center space-y-3">
+          <span className="text-3xl block">🔑</span>
+          <h3 className="font-bold text-sm text-gray-900">시작하기</h3>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Gemini API 키를 설정하면 무료로 콘텐츠 요약을 사용할 수 있습니다.
+            <br />
+            Google AI Studio에서 무료로 발급받을 수 있습니다.
+          </p>
+          <button onClick={onGoToSettings} className="btn-primary w-full text-sm">
+            설정으로 이동
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-3 space-y-3">
       {state.status !== 'loading' && (
@@ -271,33 +253,6 @@ function SummarizeTab({
         <div className="card p-6 flex flex-col items-center gap-3">
           <div className="animate-spin w-8 h-8 border-3 border-primary-500 border-t-transparent rounded-full" />
           <p className="text-sm text-gray-600 text-center">{state.message}</p>
-        </div>
-      )}
-
-      {state.status === 'needs_whisper' && (
-        <div className="card p-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">🎙️</span>
-            <div>
-              <p className="font-semibold text-sm text-gray-900 mb-1">자막이 없는 영상입니다</p>
-              <p className="text-xs text-gray-500">
-                Whisper AI로 음성을 텍스트로 변환한 후 요약할 수 있습니다.
-                <br />
-                <span className="text-yellow-600">⚠️ 추가 비용이 발생하며 1~3분이 소요됩니다.</span>
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => onWhisperConfirm(state.videoId)}
-              className="btn-primary flex-1 text-sm"
-            >
-              🎙️ Whisper로 변환하기
-            </button>
-            <button onClick={onRetry} className="btn-secondary flex-1 text-sm">
-              취소
-            </button>
-          </div>
         </div>
       )}
 

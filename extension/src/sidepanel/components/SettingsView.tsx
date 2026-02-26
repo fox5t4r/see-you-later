@@ -10,6 +10,7 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (response: { success: boolean; data: Settings }) => {
@@ -34,9 +35,32 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
     );
   };
 
-  const update = (key: keyof Settings, value: string) => {
+  const handleSyncNow = () => {
+    setSyncing(true);
+    chrome.runtime.sendMessage(
+      { type: 'SYNC_WATCH_LATER' },
+      (response: { success: boolean; data?: { count: number }; error?: string }) => {
+        setSyncing(false);
+        if (response?.success) {
+          const count = response.data?.count ?? 0;
+          alert(count > 0 ? `${count}개의 영상 요약을 전송했습니다.` : '새로운 영상이 없습니다.');
+        } else {
+          alert(response?.error ?? '동기화 중 오류가 발생했습니다.');
+        }
+      }
+    );
+  };
+
+  const update = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
+
+  const hasWatchLaterExportTarget =
+    (settings.watchLaterAutoExport === 'slack' || settings.watchLaterAutoExport === 'both')
+      ? !!settings.slackWebhookUrl
+      : (settings.watchLaterAutoExport === 'notion' || settings.watchLaterAutoExport === 'both')
+        ? !!(settings.notionToken && settings.notionDatabaseId)
+        : false;
 
   return (
     <div className="p-4 space-y-5">
@@ -65,10 +89,10 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
         </div>
       </section>
 
-      {/* API 키 */}
+      {/* Gemini API 키 */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm text-gray-700">API 키</h3>
+          <h3 className="font-semibold text-sm text-gray-700">Gemini API 키</h3>
           <button
             onClick={() => setShowApiKeys(!showApiKeys)}
             className="text-xs text-gray-400 hover:text-gray-600"
@@ -77,61 +101,103 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
           </button>
         </div>
 
-        <div className="space-y-2">
-          <label className="block">
-            <span className="text-xs font-medium text-gray-600 mb-1 block">
-              Anthropic API Key <span className="text-red-500">*</span>
-            </span>
-            <input
-              type={showApiKeys ? 'text' : 'password'}
-              value={settings.anthropicApiKey ?? ''}
-              onChange={(e) => update('anthropicApiKey', e.target.value)}
-              placeholder="sk-ant-..."
-              className="input-field font-mono text-xs"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Claude 요약에 사용됩니다.{' '}
-              <a
-                href="https://console.anthropic.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-600 hover:underline"
-              >
-                발급받기
-              </a>
-            </p>
-          </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600 mb-1 block">
+            API Key <span className="text-red-500">*</span>
+          </span>
+          <input
+            type={showApiKeys ? 'text' : 'password'}
+            value={settings.geminiApiKey ?? ''}
+            onChange={(e) => update('geminiApiKey', e.target.value)}
+            placeholder="AIza..."
+            className="input-field font-mono text-xs"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            무료로 발급 가능합니다.{' '}
+            <a
+              href="https://aistudio.google.com/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-600 hover:underline"
+            >
+              Google AI Studio에서 발급받기
+            </a>
+          </p>
+        </label>
 
-          <label className="block">
-            <span className="text-xs font-medium text-gray-600 mb-1 block">
-              OpenAI API Key
-              <span className="text-gray-400 font-normal"> (자막 없는 유튜브 영상용)</span>
-            </span>
-            <input
-              type={showApiKeys ? 'text' : 'password'}
-              value={settings.openaiApiKey ?? ''}
-              onChange={(e) => update('openaiApiKey', e.target.value)}
-              placeholder="sk-..."
-              className="input-field font-mono text-xs"
-            />
-          </label>
-        </div>
+        {!settings.geminiApiKey && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-blue-800">API 키 발급 방법 (무료)</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+              <li>위 링크를 클릭하여 Google AI Studio 접속</li>
+              <li>Google 계정으로 로그인</li>
+              <li>"Create API Key" 버튼 클릭</li>
+              <li>생성된 키를 위 입력란에 붙여넣기</li>
+            </ol>
+            <p className="text-xs text-blue-600">
+              무료 한도: 하루 약 250회 요약 가능
+            </p>
+          </div>
+        )}
       </section>
 
-      {/* Whisper 백엔드 */}
-      <section className="space-y-2">
-        <h3 className="font-semibold text-sm text-gray-700">Whisper 백엔드</h3>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600 mb-1 block">백엔드 URL</span>
-          <input
-            type="url"
-            value={settings.backendUrl ?? 'http://localhost:8000'}
-            onChange={(e) => update('backendUrl', e.target.value)}
-            placeholder="http://localhost:8000"
-            className="input-field text-xs"
-          />
-          <p className="text-xs text-gray-400 mt-1">자막 없는 영상 처리를 위한 FastAPI 서버 주소</p>
+      {/* Watch Later 자동 요약 */}
+      <section className="space-y-3">
+        <h3 className="font-semibold text-sm text-gray-700">Watch Later 자동 요약</h3>
+
+        <label className="flex items-center gap-3 cursor-pointer">
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={settings.watchLaterEnabled ?? false}
+              onChange={(e) => update('watchLaterEnabled', e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-gray-300 rounded-full peer-checked:bg-primary-600 transition-colors" />
+            <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+          </div>
+          <span className="text-xs text-gray-700">자동 요약 활성화</span>
         </label>
+
+        {settings.watchLaterEnabled && (
+          <div className="space-y-3 pl-1">
+            <label className="block">
+              <span className="text-xs font-medium text-gray-600 mb-1 block">확인 주기</span>
+              <select
+                value={settings.watchLaterInterval ?? 60}
+                onChange={(e) => update('watchLaterInterval', Number(e.target.value) as Settings['watchLaterInterval'])}
+                className="input-field text-xs"
+              >
+                <option value={30}>30분마다</option>
+                <option value={60}>1시간마다</option>
+                <option value={180}>3시간마다</option>
+                <option value={360}>6시간마다</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-medium text-gray-600 mb-1 block">자동 내보내기 대상</span>
+              <select
+                value={settings.watchLaterAutoExport ?? 'none'}
+                onChange={(e) => update('watchLaterAutoExport', e.target.value as Settings['watchLaterAutoExport'])}
+                className="input-field text-xs"
+              >
+                <option value="none">선택 안 함</option>
+                <option value="slack">Slack</option>
+                <option value="notion">Notion</option>
+                <option value="both">Slack + Notion 모두</option>
+              </select>
+            </label>
+
+            <button
+              onClick={handleSyncNow}
+              disabled={syncing || !settings.geminiApiKey}
+              className="btn-secondary w-full text-xs"
+            >
+              {syncing ? '동기화 중...' : '지금 동기화'}
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Notion */}

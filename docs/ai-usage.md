@@ -9,8 +9,9 @@
 | 도구 | 용도 |
 |------|------|
 | **Cursor AI (claude-sonnet-4.6)** | 전체 프로젝트 설계, 코드 생성, 디버깅 |
-| **Claude Haiku 4.5** | 실제 프로덕션 요약 AI (확장 프로그램 내 사용) |
-| **OpenAI Whisper** | 자막 없는 유튜브 영상 음성 변환 |
+| **Gemini 2.5 Flash (Google)** | 실제 프로덕션 요약 AI (확장 프로그램 내 사용) |
+| ~~Claude Haiku 4.5~~ | v0.1.0에서 사용, v0.2.0에서 Gemini로 교체 |
+| ~~OpenAI Whisper~~ | v0.1.0에서 사용, v0.2.0에서 Gemini 멀티모달로 대체 |
 
 ---
 
@@ -121,9 +122,26 @@
 
 ---
 
+---
+
+## v0.2.0 마이그레이션: Claude + Whisper → Gemini
+
+### 변경 이유
+- Claude API는 무료 티어가 없어 사용자에게 즉시 비용 발생
+- Docker 백엔드(Whisper + yt-dlp)는 비전공자에게 진입 장벽이 높음
+- Gemini 2.5 Flash가 무료 티어(250 RPD)와 YouTube URL 직접 처리를 모두 지원
+
+### 기술적 결정
+- **REST API 직접 호출**: `@google/generative-ai` SDK가 deprecated, `@google/genai`는 Node.js 전용이라 Chrome 서비스 워커 호환성 불확실 → fetch 기반 REST API 직접 호출
+- **하이브리드 전략**: 자막 있는 영상은 텍스트 기반(토큰 절약), 자막 없는 영상은 YouTube URL을 fileData로 전달(멀티모달)
+- **Watch Later 자동 요약**: chrome.alarms API로 주기적 체크, YouTube 페이지 HTML에서 ytInitialData 파싱
+
+---
+
 ## 배운 점
 
 1. **AI와의 협업 방식**: 큰 그림 설계는 AI와 대화로, 세부 구현은 AI가 코드 생성
 2. **프롬프트 엔지니어링의 중요성**: 출력 형식을 명확히 지정할수록 파싱 안정성 향상
-3. **비용 vs 편의성 트레이드오프**: Gemini 멀티모달이 편리하지만 Whisper가 7배 저렴
+3. **비용 vs UX 트레이드오프**: Gemini 무료 티어 + YouTube URL 직접 처리로 비용과 UX 문제를 동시에 해결
 4. **루브릭 기반 개발**: 평가 기준을 미리 분석하면 불필요한 작업을 줄일 수 있음
+5. **SDK vs REST API**: 브라우저 환경에서는 SDK 호환성 문제를 피하기 위해 REST API 직접 호출이 안정적

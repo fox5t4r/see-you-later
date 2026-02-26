@@ -61,4 +61,29 @@
 
 ---
 
+## 2026-02-26 (2차)
+
+### 작업 내용
+- Claude API → Google Gemini API 마이그레이션 (`src/lib/gemini.ts` 생성)
+- Docker 백엔드 완전 제거 (backend/, docker-compose.yml 삭제)
+- Whisper 관련 코드 제거 (whisper-client.ts, 서비스 워커 핸들러)
+- YouTube URL 직접 처리 기능 추가 (Gemini 멀티모달로 자막 없는 영상 처리)
+- Watch Later 자동 요약 기능 추가 (`src/lib/watch-later.ts`)
+- chrome.alarms 기반 자동 스케줄러 구현
+- 설정 UI 대폭 개편 (API 키 발급 가이드, Watch Later 설정)
+- 온보딩 플로우 추가 (API 키 미설정 시 가이드 표시)
+- manifest.json 권한 추가 (alarms, notifications)
+- README.md, .env.example, docs/ai-usage.md 업데이트
+
+### 사용한 AI 도구
+- **Cursor AI**: 마이그레이션 계획 수립 및 전체 코드 리팩토링
+
+### 이슈 / 배운 점
+- Gemini 무료 티어로 전환하여 사용자 비용 부담 제거 (하루 250회 무료)
+- Docker 백엔드 제거로 비전공자도 쉽게 설치 가능해짐
+- Gemini의 YouTube URL 직접 처리 기능으로 Whisper + yt-dlp 파이프라인 불필요
+- `@google/generative-ai` SDK가 deprecated되어 REST API 직접 호출 방식 선택
+
+---
+
 <!-- 이후 작업 날짜를 위 형식으로 추가하세요 -->

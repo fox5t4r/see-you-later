@@ -10,19 +10,25 @@
 ## [Unreleased]
 
 ### Added
-- Phase 0: Git 초기화, Conventional Commits (commitlint + husky), GitHub Flow 브랜치 전략
-- Phase 0: PR 템플릿, 이슈 템플릿 (버그 리포트, 기능 요청), CONTRIBUTING.md
-- Phase 0: GitHub Actions CI/CD (확장 빌드 + Docker 이미지 빌드)
-- Phase 1: 크롬 확장 스캐폴딩 (Manifest V3, Vite, TypeScript, React 18, Tailwind CSS)
-- Phase 1: 웹 페이지 본문 추출 (Content Script + Mozilla Readability)
-- Phase 1: Claude Haiku 4.5 API 연동 및 모드별 프롬프트 (학습/일반 × 웹/유튜브)
-- Phase 1: 사이드 패널 UI (모드 선택, 요약 버튼, 결과 카드, 추천도, 설정, 히스토리)
-- Phase 2: 유튜브 자막 추출 (YouTube Innertube API, 타임스탬프 포함)
-- Phase 2: Whisper 폴백 - 자막 없는 영상 처리 (FastAPI + yt-dlp + OpenAI Whisper)
-- Phase 2: 요약 히스토리 (chrome.storage, 최대 50개)
-- Phase 3: Notion 내보내기 (Integration API, 구조화된 블록)
-- Phase 3: Slack 내보내기 (Incoming Webhook, Block Kit)
-- Phase 3: 마크다운 복사 (클립보드)
+- Watch Later 자동 요약 기능 (chrome.alarms 기반 주기적 체크)
+- Watch Later 영상 감지 모듈 (YouTube 페이지 HTML 파싱)
+- 배치 요약 → Slack/Notion 자동 내보내기
+- 온보딩 플로우 (API 키 미설정 시 발급 가이드 표시)
+- Watch Later 설정 UI (활성화 토글, 주기, 내보내기 대상)
+- "지금 동기화" 수동 트리거 버튼
+
+### Changed
+- **AI 엔진 교체**: Claude Haiku 4.5 → Gemini 2.5 Flash (무료 티어 지원)
+- **YouTube 자막 없는 영상 처리**: Whisper + yt-dlp → Gemini YouTube URL 직접 처리
+- **설정 UI**: Anthropic/OpenAI API 키 → Gemini API 키 단일화
+- UX 단순화: needs_whisper 상태 및 Whisper 확인 다이얼로그 제거
+
+### Removed
+- Docker 백엔드 (FastAPI + yt-dlp + Whisper) 전체 제거
+- `docker-compose.yml` 제거
+- `extension/src/lib/claude.ts` 제거
+- `extension/src/lib/whisper-client.ts` 제거
+- Settings에서 `anthropicApiKey`, `openaiApiKey`, `backendUrl` 필드 제거
 
 ---
 

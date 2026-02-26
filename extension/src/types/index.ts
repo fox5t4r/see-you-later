@@ -82,25 +82,42 @@ export interface HistoryItem {
 // 설정
 export interface Settings {
   defaultMode: SummaryMode;
-  anthropicApiKey: string;
-  openaiApiKey: string;
-  backendUrl: string;
+  geminiApiKey: string;
   notionToken: string;
   notionDatabaseId: string;
   slackWebhookUrl: string;
   summaryLanguage: 'ko' | 'en';
+  watchLaterEnabled: boolean;
+  watchLaterInterval: 30 | 60 | 180 | 360;
+  watchLaterAutoExport: 'slack' | 'notion' | 'both' | 'none';
 }
 
 // 기본 설정값
 export const DEFAULT_SETTINGS: Settings = {
   defaultMode: 'summary',
-  anthropicApiKey: '',
-  openaiApiKey: '',
-  backendUrl: 'http://localhost:8000',
+  geminiApiKey: '',
   notionToken: '',
   notionDatabaseId: '',
   slackWebhookUrl: '',
   summaryLanguage: 'ko',
+  watchLaterEnabled: false,
+  watchLaterInterval: 60,
+  watchLaterAutoExport: 'none',
+};
+
+// Watch Later 처리된 영상 추적
+export interface WatchLaterState {
+  processedVideoIds: string[];
+  lastCheckedAt: number;
+  dailyRequestCount: number;
+  dailyResetDate: string;
+}
+
+export const DEFAULT_WATCH_LATER_STATE: WatchLaterState = {
+  processedVideoIds: [],
+  lastCheckedAt: 0,
+  dailyRequestCount: 0,
+  dailyResetDate: '',
 };
 
 // 메시지 타입 (Service Worker <-> Content Script <-> Side Panel)
@@ -118,7 +135,8 @@ export type MessageType =
   | 'CLEAR_HISTORY'
   | 'EXPORT_NOTION'
   | 'EXPORT_SLACK'
-  | 'WHISPER_TRANSCRIBE';
+  | 'SYNC_WATCH_LATER'
+  | 'GET_WATCH_LATER_STATUS';
 
 export interface Message {
   type: MessageType;

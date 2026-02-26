@@ -36,7 +36,9 @@
     "tabs",
     "storage",
     "sidePanel",
-    "scripting"
+    "scripting",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://*/*",

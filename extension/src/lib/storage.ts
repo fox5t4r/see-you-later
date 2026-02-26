@@ -1,4 +1,4 @@
-import type { Settings, HistoryItem, DEFAULT_SETTINGS } from '@/types';
+import type { Settings, HistoryItem } from '@/types';
 import { DEFAULT_SETTINGS as defaults } from '@/types';
 
 const HISTORY_KEY = 'syl_history';
