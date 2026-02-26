@@ -102,6 +102,13 @@ async function handleMessage(
         break;
       }
 
+      case 'SAVE_HISTORY': {
+        const items = message.payload as HistoryItem[];
+        await chrome.storage.local.set({ history: items });
+        sendResponse({ success: true });
+        break;
+      }
+
       case 'EXPORT_NOTION': {
         const { item } = message.payload as { item: HistoryItem };
         const settings = await getSettings();

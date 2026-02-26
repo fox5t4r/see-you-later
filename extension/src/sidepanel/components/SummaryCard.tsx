@@ -120,7 +120,7 @@ function RecommendationSection({
     <div className={`rounded-lg p-3 ${scoreColor(rec.score)}`}>
       <div className="flex items-center justify-between mb-1">
         <span className="font-bold text-sm">추천도</span>
-        <span className="font-bold text-sm tracking-wide">{rec.score} <span className="text-xs font-normal opacity-70">/ 5</span></span>
+        <span className="font-bold text-sm tracking-wide">{rec.score} <span className="font-bold text-sm opacity-70">/ 5</span></span>
       </div>
       <p className="text-xs leading-relaxed mt-1">{rec.reason}</p>
       <div className="mt-3 space-y-1.5">

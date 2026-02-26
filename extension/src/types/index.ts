@@ -133,6 +133,7 @@ export type MessageType =
   | 'SAVE_SETTINGS'
   | 'GET_HISTORY'
   | 'CLEAR_HISTORY'
+  | 'SAVE_HISTORY'
   | 'EXPORT_NOTION'
   | 'EXPORT_SLACK'
   | 'SYNC_WATCH_LATER'

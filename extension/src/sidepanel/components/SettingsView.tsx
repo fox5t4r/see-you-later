@@ -302,8 +302,19 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
         disabled={saving || saved}
         className="btn-primary w-full"
       >
-        {saved ? '✅ 저장됨' : saving ? '저장 중...' : '설정 저장'}
+        {saved ? '저장됨' : saving ? '저장 중...' : '설정 저장'}
       </button>
+
+      {/* 건의 사항 */}
+      <p className="text-center text-xs text-gray-400 pb-2">
+        건의 사항 ·{' '}
+        <a
+          href="mailto:zxckg2005@gmail.com"
+          className="hover:text-gray-600 transition-colors"
+        >
+          zxckg2005@gmail.com
+        </a>
+      </p>
     </div>
   );
 }
