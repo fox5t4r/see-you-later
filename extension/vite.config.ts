@@ -1,29 +1,26 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 
 export default defineConfig({
   plugins: [
     react(),
     {
-      // manifest.json과 아이콘을 dist로 복사
-      name: 'copy-manifest',
+      name: 'copy-extension-assets',
       closeBundle() {
-        const files = ['manifest.json'];
-        files.forEach((file) => {
-          try {
-            copyFileSync(resolve(__dirname, file), resolve(__dirname, 'dist', file));
-          } catch {
-            // 파일이 없으면 무시
-          }
-        });
+        copyFileSync(
+          resolve(__dirname, 'manifest.json'),
+          resolve(__dirname, 'dist', 'manifest.json'),
+        );
 
-        // 아이콘 폴더 복사
         const iconsDir = resolve(__dirname, 'public/icons');
         const distIconsDir = resolve(__dirname, 'dist/icons');
         if (existsSync(iconsDir)) {
           if (!existsSync(distIconsDir)) mkdirSync(distIconsDir, { recursive: true });
+          for (const file of readdirSync(iconsDir)) {
+            copyFileSync(resolve(iconsDir, file), resolve(distIconsDir, file));
+          }
         }
       },
     },
