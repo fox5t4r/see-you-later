@@ -129,6 +129,15 @@ function extractWatchLaterFromPage(): Array<{ videoId: string; title: string }> 
   const seen = new Set<string>();
   const videos: Array<{ videoId: string; title: string }> = [];
 
+  const JUNK_PATTERNS = /^(시청함|지금 재생 중|재생$|^\d+:\d+$|^[\d: ]+$|대기열에 추가|나중에 볼)/;
+
+  function isValidTitle(text: string): boolean {
+    if (!text || text.length < 2) return false;
+    if (JUNK_PATTERNS.test(text.trim())) return false;
+    if (/^\d+:\d+/.test(text.trim()) && text.trim().length < 12) return false;
+    return true;
+  }
+
   function addVideo(videoId: string, title: string) {
     if (videoId && !seen.has(videoId)) {
       seen.add(videoId);
@@ -136,35 +145,62 @@ function extractWatchLaterFromPage(): Array<{ videoId: string; title: string }> 
     }
   }
 
+  /**
+   * renderer 요소에서 videoId와 title을 추출.
+   * title 속성 → #video-title textContent → aria-label 순으로 시도.
+   */
+  function extractFromRenderer(el: Element): { videoId: string; title: string } | null {
+    const titleLink = el.querySelector('a#video-title') as HTMLAnchorElement | null;
+    const anyLink = el.querySelector('a[href*="/watch?v="]') as HTMLAnchorElement | null;
+    const link = titleLink ?? anyLink;
+    if (!link) return null;
+
+    const href = link.href || link.getAttribute('href') || '';
+    const match = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (!match) return null;
+
+    const videoId = match[1];
+
+    // title 속성이 가장 깨끗한 제목 (YouTube가 명시적으로 설정)
+    const attrTitle = (titleLink?.getAttribute('title') ?? '').trim();
+    if (isValidTitle(attrTitle)) return { videoId, title: attrTitle };
+
+    // aria-label도 깨끗한 제목을 포함
+    const ariaLabel = (titleLink?.getAttribute('aria-label') ?? '').trim();
+    if (isValidTitle(ariaLabel)) return { videoId, title: ariaLabel };
+
+    // #video-title의 textContent (오버레이가 아닌 제목 전용 요소)
+    if (titleLink) {
+      const text = (titleLink.textContent ?? '').trim();
+      if (isValidTitle(text)) return { videoId, title: text };
+    }
+
+    // renderer 자체의 data 속성에서 제목 시도
+    const dataTitle = el.querySelector('[title]')?.getAttribute('title') ?? '';
+    if (isValidTitle(dataTitle.trim())) return { videoId, title: dataTitle.trim() };
+
+    return { videoId, title: '제목 없음' };
+  }
+
   // === 전략 1: DOM 파싱 (YouTube SPA 렌더링 후 가장 신뢰도 높음) ===
   try {
-    // 1-a: ytd-playlist-video-renderer 커스텀 요소
     const renderers = document.querySelectorAll('ytd-playlist-video-renderer');
     for (const el of renderers) {
-      const link = el.querySelector('a#video-title, a.yt-simple-endpoint[href*="/watch"]') as HTMLAnchorElement | null;
-      if (!link) continue;
-      const href = link.href || link.getAttribute('href') || '';
-      const match = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-      if (match) {
-        addVideo(match[1], (link.textContent ?? '').trim());
-      }
+      const result = extractFromRenderer(el);
+      if (result) addVideo(result.videoId, result.title);
     }
     if (videos.length > 0) return videos;
 
-    // 1-b: 일반적인 playlist 영역 내 링크
-    const container = document.querySelector('#contents, ytd-playlist-video-list-renderer, [id="playlist-items"]');
-    if (container) {
-      const links = container.querySelectorAll('a[href*="/watch?v="]');
-      for (const a of links) {
-        const href = (a as HTMLAnchorElement).href || '';
-        const match = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-        if (match) {
-          const title = (a as HTMLElement).textContent?.trim()
-            || a.getAttribute('title')
-            || '';
-          if (title.length > 1) {
-            addVideo(match[1], title);
-          }
+    // 1-b: #video-title 링크만 직접 탐색 (오버레이 링크 회피)
+    const titleLinks = document.querySelectorAll('#contents a#video-title[href*="/watch?v="]');
+    for (const a of titleLinks) {
+      const href = (a as HTMLAnchorElement).href || '';
+      const match = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+      if (match) {
+        const title = a.getAttribute('title')?.trim()
+          || (a.textContent ?? '').trim();
+        if (isValidTitle(title)) {
+          addVideo(match[1], title);
         }
       }
     }
