@@ -33,12 +33,13 @@
   ],
   "permissions": [
     "activeTab",
+    "tabs",
     "storage",
     "sidePanel",
     "scripting"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*",
-    "https://youtube.com/*"
+    "https://*/*",
+    "http://*/*"
   ]
 }

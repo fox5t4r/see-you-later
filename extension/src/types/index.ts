@@ -106,6 +106,7 @@ export const DEFAULT_SETTINGS: Settings = {
 // 메시지 타입 (Service Worker <-> Content Script <-> Side Panel)
 export type MessageType =
   | 'EXTRACT_CONTENT'
+  | 'EXTRACT_AND_SUMMARIZE'
   | 'CONTENT_EXTRACTED'
   | 'SUMMARIZE'
   | 'SUMMARY_RESULT'
