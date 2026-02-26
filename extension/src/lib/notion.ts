@@ -81,8 +81,25 @@ async function checkIsDatabase(id: string, token: string): Promise<boolean> {
   }
 }
 
-function notionText(content: string, maxLen = 2000) {
-  return [{ text: { content: content.slice(0, maxLen) } }];
+/**
+ * AI 응답에서 배열/객체가 섞여 들어올 수 있으므로 항상 문자열로 정규화한 뒤 전달합니다.
+ */
+function toSafeString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(toSafeString).join(', ');
+  if (value !== null && typeof value === 'object') {
+    const v = value as Record<string, unknown>;
+    // { concept, explanation } 같은 객체면 concept 필드 우선 추출
+    if (typeof v['concept'] === 'string') return v['concept'];
+    if (typeof v['text'] === 'string') return v['text'];
+    return JSON.stringify(value);
+  }
+  return String(value ?? '');
+}
+
+function notionText(content: unknown, maxLen = 2000) {
+  const safe = toSafeString(content).slice(0, maxLen);
+  return [{ text: { content: safe } }];
 }
 
 function buildNotionBlocks(item: HistoryItem) {
@@ -125,35 +142,38 @@ function buildNotionBlocks(item: HistoryItem) {
 
   if (result.mode === 'learn') {
     blocks.push(heading('핵심 개념', 2));
-    result.coreConcepts.forEach((concept) => {
-      blocks.push(heading(concept.concept, 3));
-      blocks.push(paragraph(concept.explanation));
-      if (concept.whyItMatters) blocks.push(paragraph(`💡 ${concept.whyItMatters}`));
+    const concepts = Array.isArray(result.coreConcepts) ? result.coreConcepts : [];
+    concepts.forEach((concept) => {
+      blocks.push(heading(toSafeString(concept.concept), 3));
+      blocks.push(paragraph(toSafeString(concept.explanation)));
+      if (concept.whyItMatters) blocks.push(paragraph(`💡 ${toSafeString(concept.whyItMatters)}`));
     });
     blocks.push(divider());
 
     blocks.push(heading('배울 점', 2));
-    result.keyTakeaways.forEach((t) => blocks.push(bullet(t)));
+    const takeaways = Array.isArray(result.keyTakeaways) ? result.keyTakeaways : [];
+    takeaways.forEach((t) => blocks.push(bullet(toSafeString(t))));
     blocks.push(divider());
 
     blocks.push(heading('실제 적용', 2));
-    blocks.push(paragraph(result.practicalApplication));
+    blocks.push(paragraph(toSafeString(result.practicalApplication)));
 
     blocks.push(heading('배경 지식', 2));
-    blocks.push(paragraph(result.backgroundContext));
+    blocks.push(paragraph(toSafeString(result.backgroundContext)));
 
     if (result.furtherLearning) {
       blocks.push(heading('더 알아보기', 2));
-      blocks.push(paragraph(result.furtherLearning));
+      blocks.push(paragraph(toSafeString(result.furtherLearning)));
     }
   } else {
     blocks.push(heading('3줄 요약', 2));
-    result.threeLineSummary.forEach((line) => blocks.push(bullet(line)));
+    const summary = Array.isArray(result.threeLineSummary) ? result.threeLineSummary : [];
+    summary.forEach((line) => blocks.push(bullet(toSafeString(line))));
     blocks.push(divider());
 
     blocks.push(heading('전체 요약', 2));
     // Notion 블록 하나당 2000자 제한 — 긴 요약은 분할
-    const full = result.fullSummary;
+    const full = toSafeString(result.fullSummary);
     const chunkSize = 1900;
     for (let i = 0; i < full.length; i += chunkSize) {
       blocks.push(paragraph(full.slice(i, i + chunkSize)));
@@ -163,7 +183,7 @@ function buildNotionBlocks(item: HistoryItem) {
   if ('keyMoments' in result && result.keyMoments && result.keyMoments.length > 0) {
     blocks.push(divider());
     blocks.push(heading('주요 타임스탬프', 2));
-    result.keyMoments.forEach((m) => blocks.push(bullet(`[${m.timestamp}] ${m.description}`)));
+    result.keyMoments.forEach((m) => blocks.push(bullet(`[${toSafeString(m.timestamp)}] ${toSafeString(m.description)}`)));
   }
 
   // Notion API는 한 번에 최대 100개 블록만 허용

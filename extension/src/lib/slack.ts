@@ -2,8 +2,24 @@ import type { HistoryItem } from '@/types';
 
 const SLACK_MAX_TEXT = 2900;
 
-function truncate(text: string, max = SLACK_MAX_TEXT): string {
-  return text.length > max ? text.slice(0, max) + '...' : text;
+/**
+ * AI 응답에서 배열/객체가 섞여 들어올 수 있으므로 항상 문자열로 정규화합니다.
+ */
+function toSafeString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(toSafeString).join(', ');
+  if (value !== null && typeof value === 'object') {
+    const v = value as Record<string, unknown>;
+    if (typeof v['concept'] === 'string') return v['concept'];
+    if (typeof v['text'] === 'string') return v['text'];
+    return JSON.stringify(value);
+  }
+  return String(value ?? '');
+}
+
+function truncate(text: unknown, max = SLACK_MAX_TEXT): string {
+  const s = toSafeString(text);
+  return s.length > max ? s.slice(0, max) + '...' : s;
 }
 
 export async function exportToSlack(item: HistoryItem, webhookUrl: string): Promise<void> {
@@ -69,18 +85,20 @@ export async function exportToSlack(item: HistoryItem, webhookUrl: string): Prom
 
   if (result.mode === 'learn') {
     // 학습 모드: 핵심 개념 + 배울 점 + 실제 적용
-    const conceptLines = result.coreConcepts
-      .map((c) => `*${c.concept}*\n${c.explanation}`)
+    const concepts = Array.isArray(result.coreConcepts) ? result.coreConcepts : [];
+    const conceptLines = concepts
+      .map((c) => `*${toSafeString(c.concept)}*\n${toSafeString(c.explanation)}`)
       .join('\n\n');
     blocks.push({
       type: 'section',
       text: { type: 'mrkdwn', text: `*핵심 개념:*\n${truncate(conceptLines)}` },
     });
 
-    const takeaways = result.keyTakeaways.map((t) => `• ${t}`).join('\n');
+    const takeaways = Array.isArray(result.keyTakeaways) ? result.keyTakeaways : [];
+    const takeawayText = takeaways.map((t) => `• ${toSafeString(t)}`).join('\n');
     blocks.push({
       type: 'section',
-      text: { type: 'mrkdwn', text: `*배울 점:*\n${truncate(takeaways)}` },
+      text: { type: 'mrkdwn', text: `*배울 점:*\n${truncate(takeawayText)}` },
     });
 
     blocks.push({
@@ -89,7 +107,8 @@ export async function exportToSlack(item: HistoryItem, webhookUrl: string): Prom
     });
   } else {
     // 일반 모드: 3줄 요약 + 전체 요약 모두 전송
-    const threeLine = result.threeLineSummary.map((l) => `• ${l}`).join('\n');
+    const summary = Array.isArray(result.threeLineSummary) ? result.threeLineSummary : [];
+    const threeLine = summary.map((l) => `• ${toSafeString(l)}`).join('\n');
     blocks.push({
       type: 'section',
       text: { type: 'mrkdwn', text: `*3줄 요약:*\n${threeLine}` },
@@ -105,7 +124,7 @@ export async function exportToSlack(item: HistoryItem, webhookUrl: string): Prom
 
   // 유튜브 주요 타임스탬프
   if ('keyMoments' in result && result.keyMoments && result.keyMoments.length > 0) {
-    const moments = result.keyMoments.map((m) => `• \`[${m.timestamp}]\` ${m.description}`).join('\n');
+    const moments = result.keyMoments.map((m) => `• \`[${toSafeString(m.timestamp)}]\` ${toSafeString(m.description)}`).join('\n');
     blocks.push({ type: 'divider' });
     blocks.push({
       type: 'section',
