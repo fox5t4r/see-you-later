@@ -36,21 +36,58 @@ export default function App() {
   const handleSummarize = useCallback(async () => {
     setState({ status: 'loading', message: '페이지 내용을 분석하는 중...' });
 
-    // 현재 탭의 콘텐츠 추출
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab.id) {
+    if (!tab.id || !tab.url) {
       setState({ status: 'error', message: '현재 탭을 찾을 수 없습니다.' });
       return;
     }
+
+    const BLOCKED_PREFIXES = ['chrome://', 'chrome-extension://', 'about:', 'edge://', 'devtools://'];
+    const BLOCKED_HOSTS = ['accounts.google.com', 'chromewebstore.google.com', 'chrome.google.com'];
+    try {
+      const url = new URL(tab.url);
+      if (
+        BLOCKED_PREFIXES.some((p) => tab.url!.startsWith(p)) ||
+        BLOCKED_HOSTS.includes(url.hostname)
+      ) {
+        setState({
+          status: 'error',
+          message: '이 페이지에서는 요약할 수 없습니다. 일반 웹 페이지나 유튜브에서 사용해주세요.',
+        });
+        return;
+      }
+    } catch {
+      setState({ status: 'error', message: '유효하지 않은 페이지입니다.' });
+      return;
+    }
+
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content/extractor.js'],
+      });
+    } catch {
+      // 이미 주입되었거나 주입 불가능한 페이지
+    }
+
+    await new Promise((r) => setTimeout(r, 100));
 
     chrome.tabs.sendMessage(
       tab.id,
       { type: 'EXTRACT_CONTENT' },
       (contentResponse: { success: boolean; data: ExtractedContent; error?: string }) => {
-        if (!contentResponse?.success) {
+        if (chrome.runtime.lastError || !contentResponse?.success) {
           setState({
             status: 'error',
-            message: contentResponse?.error ?? '페이지 내용을 추출할 수 없습니다.',
+            message: contentResponse?.error ?? '페이지 내용을 가져올 수 없습니다. 페이지를 새로고침 후 다시 시도해주세요.',
+          });
+          return;
+        }
+
+        if (!contentResponse.data.text && contentResponse.data.type === 'webpage') {
+          setState({
+            status: 'error',
+            message: '이 페이지에서 요약할 콘텐츠를 찾을 수 없습니다. 기사나 블로그 같은 텍스트 콘텐츠가 있는 페이지에서 사용해주세요.',
           });
           return;
         }
@@ -64,8 +101,8 @@ export default function App() {
             data?: { result: SummarizeResult; historyItem: HistoryItem; needsWhisper?: boolean; videoId?: string };
             error?: string;
           }) => {
-            if (!response.success) {
-              setState({ status: 'error', message: response.error ?? '요약 중 오류가 발생했습니다.' });
+            if (!response?.success) {
+              setState({ status: 'error', message: response?.error ?? '요약 중 오류가 발생했습니다.' });
               return;
             }
 
