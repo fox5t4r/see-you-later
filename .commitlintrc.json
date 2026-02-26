@@ -1,0 +1,11 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "scope-enum": [
+      2,
+      "always",
+      ["extension", "backend", "docs", "ci", "deps", "release"]
+    ],
+    "subject-max-length": [2, "always", 100]
+  }
+}
