@@ -24,6 +24,7 @@ interface GeminiRequest {
   generationConfig?: {
     maxOutputTokens?: number;
     responseMimeType?: string;
+    thinkingConfig?: { thinkingBudget: number };
   };
 }
 
@@ -72,6 +73,7 @@ export async function summarize(
     generationConfig: {
       maxOutputTokens: 2048,
       responseMimeType: 'application/json',
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
 
@@ -101,6 +103,7 @@ export async function summarizeYouTubeByUrl(
     generationConfig: {
       maxOutputTokens: 2048,
       responseMimeType: 'application/json',
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
 
@@ -135,27 +138,58 @@ async function callGemini(body: GeminiRequest, apiKey: string): Promise<Summariz
 
   const data = await response.json() as {
     candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
       finishReason?: string;
     }>;
   };
 
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const parts = data.candidates?.[0]?.content?.parts ?? [];
+
+  // Gemini 2.5 Flash는 thinking 파트가 먼저 올 수 있음 — thought가 아닌 마지막 텍스트 파트를 사용
+  const responsePart = parts.filter((p) => !p.thought && p.text).pop();
+  const rawText = responsePart?.text ?? '';
 
   if (!rawText) {
     const finishReason = data.candidates?.[0]?.finishReason;
     if (finishReason === 'SAFETY') {
       throw new Error('안전 필터에 의해 응답이 차단되었습니다. 다른 콘텐츠로 시도해주세요.');
     }
+    console.error('[See You Later] Empty Gemini response. Parts:', JSON.stringify(parts).slice(0, 500));
     throw new Error('AI 응답이 비어있습니다. 다시 시도해주세요.');
   }
 
-  const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? null;
-  const jsonStr = jsonMatch ? jsonMatch[1] : rawText;
+  return parseJsonResponse(rawText);
+}
 
+function parseJsonResponse(rawText: string): SummarizeResult {
+  // 1차: 직접 파싱 (responseMimeType: application/json이면 raw JSON)
   try {
-    return JSON.parse(jsonStr.trim()) as SummarizeResult;
+    return JSON.parse(rawText.trim()) as SummarizeResult;
   } catch {
-    throw new Error('AI 응답을 파싱할 수 없습니다. 다시 시도해주세요.');
+    // 계속 진행
   }
+
+  // 2차: 마크다운 코드블록 제거 후 파싱
+  const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    try {
+      return JSON.parse(codeBlockMatch[1].trim()) as SummarizeResult;
+    } catch {
+      // 계속 진행
+    }
+  }
+
+  // 3차: 첫 번째 { 부터 마지막 } 까지 추출
+  const braceStart = rawText.indexOf('{');
+  const braceEnd = rawText.lastIndexOf('}');
+  if (braceStart !== -1 && braceEnd > braceStart) {
+    try {
+      return JSON.parse(rawText.slice(braceStart, braceEnd + 1)) as SummarizeResult;
+    } catch {
+      // 계속 진행
+    }
+  }
+
+  console.error('[See You Later] Failed to parse response:', rawText.slice(0, 500));
+  throw new Error('AI 응답을 파싱할 수 없습니다. 다시 시도해주세요.');
 }
