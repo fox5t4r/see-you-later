@@ -135,7 +135,7 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
               <li>생성된 키를 위 입력란에 붙여넣기</li>
             </ol>
             <p className="text-xs text-blue-600">
-              무료 한도: 하루 약 100회 요약 가능 (Gemini 2.5 Pro 기준)
+              무료 한도: 하루 약 100회 요약 가능
             </p>
           </div>
         )}
