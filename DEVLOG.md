@@ -86,4 +86,29 @@
 
 ---
 
+## 2026-02-26 (3차)
+
+### 작업 내용
+- Gemini 2.5 Pro → Gemini 3 Flash Preview 마이그레이션 (`src/lib/gemini.ts`)
+- `THINKING_BUDGET` 128 → 0으로 변경 (thinking 파트 완전 비활성화)
+- 버전 0.2.10 → 0.2.11 업데이트 (manifest.json, package.json)
+- README 무료 한도 수정 (100회 → 250회)
+- docs/ai-usage.md: v0.2.11 마이그레이션 섹션 추가, 프로덕션 AI 항목 업데이트
+- docs/qa-prep.md: Gemini 관련 Q&A 업데이트
+- 스크린샷 11장 추가 (docs/screenshots/)
+- README 아키텍처 다이어그램 추가 (Mermaid)
+- docs/planning.md, docs/qa-prep.md 신규 작성
+
+### 사용한 AI 도구
+- **Cursor AI**: 마이그레이션 계획 수립 및 전체 문서 업데이트
+- **Brave Search (MCP)**: Gemini 3 Flash Preview 무료 한도 및 API 모델명 실시간 조회
+
+### 이슈 / 배운 점
+- Gemini 3 Flash Preview(`gemini-3-flash-preview`)가 2025년 12월 17일 출시, 2026년 1월부터 `gemini-flash-latest`의 기본 모델로 지정됨
+- 무료 RPD: 2.5 Pro(100) → 3 Flash Preview(250)로 2.5배 증가
+- `thinkingBudget=0` 설정으로 기존 thinking 파트 필터링 로직이 불필요해짐 (코드 간소화 가능)
+- 응답 속도 약 3배 향상으로 Watch Later 자동 요약 처리 시간 단축 기대
+
+---
+
 <!-- 이후 작업 날짜를 위 형식으로 추가하세요 -->

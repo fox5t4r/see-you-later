@@ -89,7 +89,7 @@ npm run build
 5. 생성된 `AIza...` 형태의 키를 복사
 6. 확장 프로그램 **설정 탭 → Gemini API 키** 입력란에 붙여넣기
 
-> **무료 한도**: Gemini 2.5 Pro 기준 하루 약 100회 요약 가능
+> **무료 한도**: Gemini 3 Flash Preview 기준 하루 약 250회 요약 가능
 
 ---
 
@@ -149,7 +149,7 @@ npm run build
 | Notion 저장 | 무료 |
 | Slack 전송 | 무료 |
 
-**무료 한도**: 하루 약 100회 요약 가능 (Gemini 2.5 Pro 기준)  
+**무료 한도**: 하루 약 250회 요약 가능 (Gemini 3 Flash Preview 기준)  
 초과 시 유료 API 키로 업그레이드하면 됩니다.
 
 ---
@@ -189,7 +189,7 @@ npm run build
 | 영역 | 기술 |
 |------|------|
 | 크롬 확장 | Manifest V3, TypeScript, React 18, Tailwind CSS, Vite |
-| AI 요약 | Gemini 2.5 Pro (Google) |
+| AI 요약 | Gemini 3 Flash Preview (Google) |
 | 내보내기 | Notion API, Slack Webhook |
 
 ---
@@ -206,7 +206,7 @@ graph TB
     end
 
     subgraph External APIs
-        GM[Gemini 2.5 Pro<br/>텍스트 요약 · 멀티모달]
+        GM[Gemini 3 Flash Preview<br/>텍스트 요약 · 멀티모달]
         NT[Notion API<br/>페이지 생성]
         SL[Slack Webhook<br/>메시지 전송]
     end

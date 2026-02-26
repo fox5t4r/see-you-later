@@ -7,6 +7,7 @@
 ## AI 도구 파이프라인 — 역할 분담 전략
 
 프로젝트 전 과정에서 **각 AI 도구의 강점에 맞게 역할을 분담**하여 활용했습니다.
+이 과정은 단순한 분담이 아닌, 컨텍스트를 극한으로 효율적으로 활용하기 위한 컨텍스트 엔지니어링의 일환입니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -33,13 +34,13 @@
 │             4. 트러블슈팅     5. UI/UX 구축     6. 문서화           │
 │           ┌──────────────┐ ┌──────────────┐ ┌──────────────┐       │
 │           │ Cursor       │ │ Cursor       │ │ Cursor       │       │
-│           │ (Opus/Sonnet)│ │ (Gemini 2.5) │ │ (Claude Opus)│       │
+│           │ (Opus/Sonnet)│ │ (Gemini 3.1) │ │ (Claude Opus)│       │
 │           │ 난이도별 분배 │ │ 프론트엔드   │ │ 최종 문서화  │       │
 │           └──────────────┘ └──────────────┘ └──────────────┘       │
 │                                                                     │
 │  7. 프로덕션 AI ─────────────────────────────────────────────       │
 │  ┌──────────────────────────────────────────────────────┐          │
-│  │  Gemini 2.5 Pro — 실제 사용자에게 요약을 제공하는 AI   │          │
+│  │  Gemini 3 Flash Preview — 실제 사용자에게 요약을 제공하는 AI │          │
 │  └──────────────────────────────────────────────────────┘          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -56,9 +57,9 @@
 | **Cursor (Claude Sonnet)** | 구현 | Agent 모드에서 전체 코드 생성, 모듈별 구현 |
 | **Cursor (Claude Opus)** | 트러블슈팅 | 복잡한 버그 원인 분석, 아키텍처 레벨 문제 해결 |
 | **Cursor (Claude Sonnet)** | 트러블슈팅 | 단순 버그 수정, 타입 에러 해결 |
-| **Cursor (Gemini 2.5)** | UI/UX | 프론트엔드 디자인 개선, 모던한 UI 구축 |
+| **Cursor (Gemini 3.1)** | UI/UX | 프론트엔드 디자인 개선, 모던한 UI 구축 |
 | **Cursor (Claude Opus)** | 문서화 | README, CONTRIBUTING, ai-usage.md 등 최종 문서 작성 |
-| **Gemini 2.5 Pro (프로덕션)** | 런타임 | 실제 사용자에게 콘텐츠 요약을 제공하는 프로덕션 AI |
+| **Gemini 3 Flash Preview (프로덕션)** | 런타임 | 실제 사용자에게 콘텐츠 요약을 제공하는 프로덕션 AI (250 RPD 무료, 2.5 Pro 대비 2.5배 한도) |
 | ~~Claude Haiku 4.5~~ | ~~v0.1.0~~ | v0.2.0에서 Gemini로 교체 |
 | ~~OpenAI Whisper~~ | ~~v0.1.0~~ | v0.2.0에서 Gemini 멀티모달로 대체 |
 
@@ -153,7 +154,7 @@ A: Vite가 가장 적합. Webpack 대비 빌드 속도 10배 빠르고,
 | 문제 | 원인 | 해결 |
 |------|------|------|
 | Watch Later 목록 추출 실패 | YouTube DOM 구조가 SPA 특성상 동적 변경 | `ytInitialData` 글로벌 변수 파싱 + `chrome.scripting` 주입 방식으로 전환 |
-| Gemini 응답 파싱 실패 | 2.5 Flash의 "thinking" 파트가 응답에 포함 | thinking 파트 필터링 로직 추가 |
+| Gemini 응답 파싱 실패 | 2.5 Flash의 "thinking" 파트가 응답에 포함 | thinking 파트 필터링 로직 추가 (v0.2.11에서 3 Flash로 전환 후 thinkingBudget=0으로 근본 해결) |
 | Notion 내보내기 400 에러 | AI가 배열 필드를 문자열로 반환하는 경우 | 타입 검증 + 자동 변환 레이어 추가 |
 
 **Sonnet으로 해결한 단순 문제들**:
@@ -171,7 +172,7 @@ A: Vite가 가장 적합. Webpack 대비 빌드 속도 10배 빠르고,
 
 ---
 
-### 5단계: UI/UX 구축 — Cursor (Gemini 2.5)
+### 5단계: UI/UX 구축 — Cursor (Gemini 3.1)
 
 프론트엔드 디자인 개선에는 Gemini 모델을 활용했습니다.
 
@@ -254,7 +255,7 @@ A: Vite가 가장 적합. Webpack 대비 빌드 속도 10배 빠르고,
 ### 변경 이유 (의사결정 과정)
 1. **비용 문제**: Claude API는 무료 티어가 없어 사용자에게 즉시 비용 발생
 2. **진입 장벽**: Docker 백엔드(Whisper + yt-dlp)는 비전공자에게 설치가 어려움
-3. **기술 기회**: Gemini 2.5가 무료 티어(250 RPD)와 YouTube URL 직접 처리를 동시 지원
+3. **기술 기회**: Gemini가 무료 티어와 YouTube URL 직접 처리를 동시 지원
 
 ### 기술적 결정
 - **REST API 직접 호출**: `@google/generative-ai` SDK가 deprecated, `@google/genai`는 Node.js 전용이라 Chrome 서비스 워커 호환성 불확실 → fetch 기반 REST API 직접 호출
@@ -264,11 +265,38 @@ A: Vite가 가장 적합. Webpack 대비 빌드 속도 10배 빠르고,
 ### 마이그레이션 결과
 | 항목 | v0.1.0 (Before) | v0.2.0 (After) |
 |------|-----------------|----------------|
-| 요약 AI | Claude Haiku 4.5 | Gemini 2.5 Pro |
+| 요약 AI | Claude Haiku 4.5 | Gemini 2.5 Pro → Gemini 3 Flash Preview (v0.2.11) |
 | 음성 변환 | OpenAI Whisper (Docker) | Gemini 멀티모달 |
 | 백엔드 | FastAPI + Docker | 없음 (서버리스) |
 | 사용자 비용 | API 키 유료 | 무료 (Gemini 무료 티어) |
 | 설치 난이도 | Docker 필요 | ZIP 압축 해제만 |
+
+---
+
+## v0.2.11 마이그레이션: Gemini 2.5 Pro → Gemini 3 Flash Preview
+
+### 변경 이유
+- **무료 한도 2.5배 증가**: 하루 100회(2.5 Pro) → 250회(3 Flash Preview)
+- **속도 향상**: 2.5 Pro 대비 약 3배 빠른 응답 — Watch Later 자동 요약 처리 시간 단축
+- **Thinking 문제 근본 해결**: `thinkingBudget=0`으로 설정하여 thinking 파트 자체를 비활성화, 기존 필터링 로직 불필요
+- **비용 효율**: 유료 전환 시 2.5 Pro($1.25/1M) 대비 3 Flash($0.50/1M)로 60% 저렴
+
+### 변경 내용 (gemini.ts)
+```
+- DEFAULT_MODEL = 'gemini-2.5-pro'
+- THINKING_BUDGET = 128
++ DEFAULT_MODEL = 'gemini-3-flash-preview'
++ THINKING_BUDGET = 0
+```
+
+### 마이그레이션 결과
+| 항목 | v0.2.10 (Before) | v0.2.11 (After) |
+|------|-----------------|----------------|
+| 요약 AI | Gemini 2.5 Pro | Gemini 3 Flash Preview |
+| 무료 RPD | 100회/일 | **250회/일** |
+| 응답 속도 | 기준 | **3배 빠름** |
+| Thinking 처리 | 필터링 필요 | **thinkingBudget=0으로 비활성화** |
+| 유료 단가 | $1.25/1M 토큰 | **$0.50/1M 토큰** |
 
 ---
 

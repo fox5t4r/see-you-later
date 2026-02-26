@@ -37,13 +37,13 @@
 - 처음에는 Claude Haiku를 사용했음 (v0.1.0)
 - 문제: Claude API는 무료 티어가 없어서 사용자가 즉시 비용을 부담해야 함
 - GPT도 마찬가지로 무료 티어 없음
-- Gemini 2.5 Pro는 하루 약 100회 무료 + YouTube URL을 직접 전달하면 영상을 분석해주는 멀티모달 기능 제공
+- Gemini는 하루 약 250회 무료(Gemini 3 Flash Preview 기준) + YouTube URL을 직접 전달하면 영상을 분석해주는 멀티모달 기능 제공
 - 이 조합은 "사용자 비용 $0"과 "자막 없는 영상도 요약 가능"을 동시에 달성할 수 있는 유일한 선택지
 
 **보충 (비교표)**:
-| | Claude | GPT | Gemini |
+| | Claude | GPT | Gemini 3 Flash Preview |
 |---|---|---|---|
-| 무료 티어 | ❌ | ❌ | ✅ (하루 ~100회) |
+| 무료 티어 | ❌ | ❌ | ✅ (하루 ~250회) |
 | YouTube 멀티모달 | ❌ | ❌ | ✅ (URL 직접 전달) |
 | 요약 품질 | 우수 | 우수 | 우수 |
 | 사용자 비용 | 유료 | 유료 | **무료** |
@@ -119,7 +119,7 @@
 Gemini + ChatGPT → 아이디어 탐색, 시장 조사
 Claude Opus      → 요구사항 명세, 아키텍처 설계, 트러블슈팅, 문서화
 Claude Sonnet    → 코드 생성, 단순 버그 수정
-Gemini 2.5       → 프론트엔드 UI/UX 디자인
+Gemini 3.1       → 프론트엔드 UI/UX 디자인
 ```
 
 - **바이브 코딩이지만 의사결정은 사람이 함**: AI가 코드를 생성하지만, "무엇을 만들지", "어떤 기술을 쓸지", "어떤 문제를 먼저 풀지"는 모두 사람이 결정
@@ -142,8 +142,8 @@ Gemini 2.5       → 프론트엔드 UI/UX 디자인
 **Gemini 응답 파싱**:
 - Gemini 2.5 Flash에서 "thinking" 파트가 응답에 포함되는 문제 발견
 - JSON만 기대했는데 thinking 텍스트 + JSON이 섞여서 파싱 실패
-- thinking 파트를 필터링하는 로직을 추가하여 해결
-- 이후 2.5 Pro로 업그레이드하면서 안정화
+- thinking 파트를 필터링하는 로직을 추가하여 임시 해결
+- v0.2.11에서 Gemini 3 Flash Preview로 전환 + `thinkingBudget=0` 설정으로 근본 해결
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "See You Later - AI 콘텐츠 요약",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "웹 페이지와 유튜브 영상을 AI로 요약합니다. 학습 모드와 일반 모드를 지원합니다.",
   "icons": {
     "16": "icons/icon-16.png",

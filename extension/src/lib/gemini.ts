@@ -10,9 +10,9 @@ import {
 } from '@/prompts/summaryMode';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_MODEL = 'gemini-2.5-pro';
-// 2.5 Pro는 thinking을 끌 수 없음 (최소 128). Flash는 0으로 비활성화 가능.
-const THINKING_BUDGET = 128;
+const DEFAULT_MODEL = 'gemini-3-flash-preview';
+// Gemini 3 Flash는 thinking을 0으로 비활성화 가능 — 불필요한 thinking 파트 없이 빠른 응답
+const THINKING_BUDGET = 0;
 const MAX_CONTENT_LENGTH = 60000;
 
 interface GeminiPart {
