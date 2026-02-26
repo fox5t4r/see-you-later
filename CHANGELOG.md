@@ -11,6 +11,17 @@
 
 ---
 
+## [0.2.2] - 2026-02-26
+
+### Changed
+- **Notion Integration 링크**: `my-integrations` → `profile/integrations/internal` (Internal Integration 직접 연결)
+- **Notion 설정 안내**: Integration 생성 시 "콘텐츠 읽기 · 콘텐츠 입력" 권한 허용 안내 추가
+- **Notion 설정 안내**: "Connections" → "연결" 로 한국어화, 연결 추가 방법 명시
+- **Notion 에러 메시지**: "Connections" → "연결" 로 한국어화
+- 버전 0.1.1 → 0.2.2
+
+---
+
 ## [0.1.1] - 2026-02-26
 
 ### Fixed

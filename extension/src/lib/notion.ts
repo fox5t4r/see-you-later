@@ -48,7 +48,7 @@ export async function exportToNotion(
     if (response.status === 403 || error.code === 'restricted_resource') {
       throw new Error(
         'Notion 접근 권한 없음\n' +
-        '저장할 페이지 우측 상단 ··· → Connections → Integration 선택',
+        '저장할 페이지 우측 상단 ··· → 연결 → Integration 선택',
       );
     }
     if (response.status === 404) {

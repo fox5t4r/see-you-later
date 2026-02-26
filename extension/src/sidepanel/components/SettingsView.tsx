@@ -213,10 +213,13 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
             className="input-field font-mono text-xs"
           />
           <p className="text-xs text-gray-400 mt-1">
-            <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-              Integration 생성
+            <a href="https://www.notion.so/profile/integrations/internal" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              Internal Integration 생성
             </a>
             {' '}후 Secret 키 입력
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            생성 시 <strong className="text-gray-500">콘텐츠 읽기 · 콘텐츠 입력</strong> 권한을 허용해주세요.
           </p>
         </label>
         <label className="block">
@@ -231,9 +234,14 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
             placeholder="notion.so/... URL에서 32자리 ID 복사"
             className="input-field font-mono text-xs"
           />
-          <p className="text-xs text-gray-400 mt-1">
-            저장할 Notion 페이지를 열고 우측 상단 ··· → <strong>Connections</strong>에서 Integration 연결 후 URL의 마지막 32자리 입력
-          </p>
+          <div className="text-xs text-gray-400 mt-1 space-y-0.5">
+            <p>URL의 마지막 32자리를 입력하세요.</p>
+            <p>
+              저장할 페이지를 열고{' '}
+              <strong className="text-gray-500">우측 상단 ··· → 연결 → 연결 추가</strong>
+              {' '}에서 Integration을 선택해야 합니다.
+            </p>
+          </div>
         </label>
       </section>
 
