@@ -103,30 +103,31 @@ export default function App() {
       <header className="bg-white border-b border-gray-100 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">👁️</span>
-            <h1 className="font-bold text-gray-900 text-sm">See You Later</h1>
+            <div className="w-5 h-5 bg-gray-900 rounded-md flex items-center justify-center">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse-fast" />
+            </div>
+            <h1 className="font-bold text-gray-900 text-sm tracking-tight">See You Later</h1>
           </div>
-          <span className="text-xs text-gray-400">AI 콘텐츠 요약</span>
+          <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-md">AI 요약</span>
         </div>
       </header>
 
       <nav className="bg-white border-b border-gray-100 flex-shrink-0">
         <div className="flex">
           {([
-            { id: 'summarize', label: '요약', icon: '✨' },
-            { id: 'history', label: '히스토리', icon: '📚' },
-            { id: 'settings', label: '설정', icon: '⚙️' },
+            { id: 'summarize', label: '요약' },
+            { id: 'history', label: '히스토리' },
+            { id: 'settings', label: '설정' },
           ] as const).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+              className={`flex-1 py-3 text-xs font-semibold transition-all ${
                 activeTab === tab.id
-                  ? 'text-primary-600 border-b-2 border-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-gray-900 border-b-2 border-gray-900'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <span className="mr-1">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
@@ -197,14 +198,18 @@ function SummarizeTab({
   if (hasApiKey === false) {
     return (
       <div className="p-4 space-y-4">
-        <div className="card p-5 text-center space-y-3">
-          <span className="text-3xl block">🔑</span>
-          <h3 className="font-bold text-sm text-gray-900">시작하기</h3>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            Gemini API 키를 설정하면 무료로 콘텐츠 요약을 사용할 수 있습니다.
-            <br />
-            Google AI Studio에서 무료로 발급받을 수 있습니다.
-          </p>
+        <div className="card p-6 text-center space-y-4">
+          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-6 h-6 border-2 border-gray-400 rounded-sm" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm text-gray-900 mb-1">시작하기</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Gemini API 키를 설정하면 무료로 콘텐츠 요약을 사용할 수 있습니다.
+              <br />
+              Google AI Studio에서 무료로 발급받을 수 있습니다.
+            </p>
+          </div>
           <button onClick={onGoToSettings} className="btn-primary w-full text-sm">
             설정으로 이동
           </button>
@@ -214,29 +219,30 @@ function SummarizeTab({
   }
 
   return (
-    <div className="p-3 space-y-3">
+    <div className="p-4 space-y-4">
       {state.status !== 'loading' && (
-        <div className="card p-3">
-          <p className="text-xs text-gray-500 mb-2 font-medium">요약 모드 선택</p>
+        <div className="card p-4">
+          <p className="text-xs text-gray-500 mb-3 font-medium">요약 모드 선택</p>
           <div className="flex gap-2">
             {([
-              { value: 'summary', label: '일반 모드', desc: '3줄 + 전체 요약', icon: '📄' },
-              { value: 'learn', label: '학습 모드', desc: '개념 + 배울 점', icon: '🎓' },
+              { value: 'summary', label: '일반 모드', desc: '3줄 + 전체 요약' },
+              { value: 'learn', label: '학습 모드', desc: '개념 + 배울 점' },
             ] as const).map((m) => (
               <button
                 key={m.value}
                 onClick={() => onModeChange(m.value)}
-                className={`flex-1 p-2.5 rounded-lg border text-left transition-colors ${
+                className={`flex-1 p-3 rounded-xl border text-left transition-all ${
                   mode === m.value
-                    ? 'bg-primary-50 border-primary-300'
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                    ? 'bg-gray-900 border-gray-900 shadow-md'
+                    : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                <div className="text-base mb-0.5">{m.icon}</div>
-                <div className={`text-xs font-semibold ${mode === m.value ? 'text-primary-700' : 'text-gray-700'}`}>
+                <div className={`text-sm font-bold mb-1 ${mode === m.value ? 'text-white' : 'text-gray-900'}`}>
                   {m.label}
                 </div>
-                <div className="text-xs text-gray-400">{m.desc}</div>
+                <div className={`text-xs ${mode === m.value ? 'text-gray-300' : 'text-gray-500'}`}>
+                  {m.desc}
+                </div>
               </button>
             ))}
           </div>
@@ -244,25 +250,30 @@ function SummarizeTab({
       )}
 
       {state.status === 'idle' && (
-        <button onClick={onSummarize} className="btn-primary w-full py-3 text-sm">
-          ✨ 현재 페이지 요약하기
+        <button onClick={onSummarize} className="btn-primary w-full py-3.5 text-sm font-bold shadow-md">
+          현재 페이지 요약하기
         </button>
       )}
 
       {state.status === 'loading' && (
-        <div className="card p-6 flex flex-col items-center gap-3">
-          <div className="animate-spin w-8 h-8 border-3 border-primary-500 border-t-transparent rounded-full" />
-          <p className="text-sm text-gray-600 text-center">{state.message}</p>
+        <div className="card p-8 flex flex-col items-center justify-center min-h-[200px] gap-4">
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 border-4 border-gray-100 rounded-full" />
+            <div className="absolute inset-0 border-4 border-gray-900 rounded-full border-t-transparent animate-spin" />
+          </div>
+          <p className="text-sm font-medium text-gray-600 text-center animate-pulse">{state.message}</p>
         </div>
       )}
 
       {state.status === 'error' && (
-        <div className="card p-4 space-y-3">
-          <div className="flex items-start gap-2">
-            <span className="text-red-500 text-lg">⚠️</span>
-            <p className="text-sm text-red-600">{state.message}</p>
+        <div className="card p-5 space-y-4 border-red-100 bg-red-50/50">
+          <div className="flex items-start gap-3">
+            <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div className="w-1 h-2.5 bg-red-500 rounded-full" />
+            </div>
+            <p className="text-sm text-red-700 font-medium leading-relaxed">{state.message}</p>
           </div>
-          <button onClick={onRetry} className="btn-secondary w-full text-sm">
+          <button onClick={onRetry} className="btn-secondary w-full text-sm bg-white">
             다시 시도
           </button>
         </div>

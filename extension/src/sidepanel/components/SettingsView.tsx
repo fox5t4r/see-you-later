@@ -11,6 +11,7 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
   const [saved, setSaved] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (response: { success: boolean; data: Settings }) => {
@@ -37,16 +38,24 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
 
   const handleSyncNow = () => {
     setSyncing(true);
+    setSyncResult(null);
     chrome.runtime.sendMessage(
       { type: 'SYNC_WATCH_LATER' },
       (response: { success: boolean; data?: { count: number }; error?: string }) => {
         setSyncing(false);
         if (response?.success) {
           const count = response.data?.count ?? 0;
-          alert(count > 0 ? `${count}개의 영상 요약을 전송했습니다.` : '새로운 영상이 없습니다.');
+          setSyncResult({
+            type: count > 0 ? 'success' : 'info',
+            message: count > 0 ? `${count}개의 영상 요약을 전송했습니다.` : '새로운 영상이 없습니다.'
+          });
         } else {
-          alert(response?.error ?? '동기화 중 오류가 발생했습니다.');
+          setSyncResult({
+            type: 'error',
+            message: response?.error ?? '동기화 중 오류가 발생했습니다.'
+          });
         }
+        setTimeout(() => setSyncResult(null), 5000);
       }
     );
   };
@@ -83,7 +92,7 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {mode === 'summary' ? '📄 일반 모드' : '🎓 학습 모드'}
+              {mode === 'summary' ? '일반 모드' : '학습 모드'}
             </button>
           ))}
         </div>
@@ -192,10 +201,37 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
             <button
               onClick={handleSyncNow}
               disabled={syncing || !settings.geminiApiKey}
-              className="btn-secondary w-full text-xs"
+              className="btn-secondary w-full text-xs flex justify-center items-center h-9"
             >
-              {syncing ? '동기화 중...' : '지금 동기화'}
+              {syncing ? (
+                <div className="loading-dots">
+                  <div />
+                  <div />
+                  <div />
+                </div>
+              ) : (
+                '지금 동기화'
+              )}
             </button>
+            
+            {syncing && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 animate-fade-in">
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  동기화가 진행 중입니다. 동영상이 많을 경우 시간이 걸릴 수 있습니다.<br/>
+                  <span className="text-gray-500">확장 프로그램 창을 닫아도 크롬만 켜져 있으면 백그라운드에서 계속 작동합니다.</span>
+                </p>
+              </div>
+            )}
+
+            {syncResult && !syncing && (
+              <div className={`rounded-lg p-3 mt-2 animate-fade-in text-xs ${
+                syncResult.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' :
+                syncResult.type === 'error' ? 'bg-red-50 border border-red-200 text-red-700' :
+                'bg-blue-50 border border-blue-200 text-blue-700'
+              }`}>
+                {syncResult.message}
+              </div>
+            )}
           </div>
         )}
       </section>

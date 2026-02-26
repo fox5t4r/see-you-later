@@ -38,7 +38,7 @@ export default function SummaryCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
               <span className={`badge ${item.contentType === 'youtube' ? 'badge-red' : 'badge-blue'}`}>
-                {item.contentType === 'youtube' ? '🎬 유튜브' : '📄 웹 페이지'}
+                {item.contentType === 'youtube' ? '유튜브' : '웹 페이지'}
               </span>
               <span className={`badge ${result.mode === 'learn' ? 'badge-purple' : 'badge-green'}`}>
                 {result.mode === 'learn' ? '학습 모드' : '일반 모드'}
@@ -84,21 +84,21 @@ export default function SummaryCard({
               className="btn-secondary flex-1 text-xs py-1.5"
               title="Notion에 저장"
             >
-              <span className="mr-1">📝</span> Notion
+              Notion 저장
             </button>
             <button
               onClick={() => onExportSlack(item)}
               className="btn-secondary flex-1 text-xs py-1.5"
               title="Slack으로 전송"
             >
-              <span className="mr-1">💬</span> Slack
+              Slack 전송
             </button>
             <button
               onClick={handleCopy}
               className="btn-secondary flex-1 text-xs py-1.5"
               title="마크다운으로 복사"
             >
-              {copied ? '✅ 복사됨' : '📋 복사'}
+              {copied ? '복사됨' : '복사'}
             </button>
           </div>
         </div>
@@ -115,34 +115,33 @@ function RecommendationSection({
   scoreColor: (score: number) => string;
 }) {
   const rec = result.recommendation;
-  const stars = '⭐'.repeat(rec.score) + '☆'.repeat(5 - rec.score);
 
   return (
     <div className={`rounded-lg p-3 ${scoreColor(rec.score)}`}>
       <div className="flex items-center justify-between mb-1">
-        <span className="font-semibold text-sm">추천도</span>
-        <span className="text-base">{stars}</span>
+        <span className="font-bold text-sm">추천도</span>
+        <span className="font-bold text-sm tracking-wide">{rec.score} <span className="text-xs font-normal opacity-70">/ 5</span></span>
       </div>
-      <p className="text-xs leading-relaxed">{rec.reason}</p>
-      <div className="mt-2 space-y-1">
+      <p className="text-xs leading-relaxed mt-1">{rec.reason}</p>
+      <div className="mt-3 space-y-1.5">
         <p className="text-xs">
-          <span className="font-medium">✅ 추천:</span> {rec.bestFor}
+          <span className="font-bold opacity-80">추천 대상:</span> {rec.bestFor}
         </p>
         <p className="text-xs">
-          <span className="font-medium">⏭️ 스킵:</span> {rec.skipIf}
+          <span className="font-bold opacity-80">스킵 대상:</span> {rec.skipIf}
         </p>
         {'worthWatching' in rec && (
           <p className="text-xs">
-            <span className="font-medium">
-              {rec.worthWatching ? '🎬 직접 시청 권장' : '📄 요약으로 충분'}
+            <span className="font-bold opacity-80">
+              {rec.worthWatching ? '직접 시청 권장' : '요약으로 충분'}
             </span>
             {rec.worthWatchingReason && `: ${rec.worthWatchingReason}`}
           </p>
         )}
         {'worthFullRead' in rec && (
           <p className="text-xs">
-            <span className="font-medium">
-              {rec.worthFullRead ? '📖 전문 읽기 권장' : '📄 요약으로 충분'}
+            <span className="font-bold opacity-80">
+              {rec.worthFullRead ? '전문 읽기 권장' : '요약으로 충분'}
             </span>
             {rec.worthFullReadReason && `: ${rec.worthFullReadReason}`}
           </p>
@@ -172,7 +171,10 @@ function LearnContent({ result }: { result: Extract<SummarizeResult, { mode: 'le
                 </div>
                 <p className="text-xs text-gray-600 leading-relaxed">{concept.explanation}</p>
                 {concept.whyItMatters && (
-                  <p className="text-xs text-primary-600 mt-1">💡 {concept.whyItMatters}</p>
+                  <p className="text-xs text-primary-600 mt-1.5 bg-primary-50 p-2 rounded-md border border-primary-100">
+                    <span className="font-medium">💡 핵심 이유: </span>
+                    {concept.whyItMatters}
+                  </p>
                 )}
               </div>
             ))}
