@@ -10,7 +10,9 @@ import {
 } from '@/prompts/summaryMode';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-2.5-pro';
+// 2.5 Pro는 thinking을 끌 수 없음 (최소 128). Flash는 0으로 비활성화 가능.
+const THINKING_BUDGET = 128;
 const MAX_CONTENT_LENGTH = 60000;
 
 interface GeminiPart {
@@ -71,9 +73,9 @@ export async function summarize(
     contents: [{ parts: [{ text: userPrompt }] }],
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
     generationConfig: {
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       responseMimeType: 'application/json',
-      thinkingConfig: { thinkingBudget: 0 },
+      thinkingConfig: { thinkingBudget: THINKING_BUDGET },
     },
   };
 
@@ -101,9 +103,9 @@ export async function summarizeYouTubeByUrl(
     }],
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
     generationConfig: {
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       responseMimeType: 'application/json',
-      thinkingConfig: { thinkingBudget: 0 },
+      thinkingConfig: { thinkingBudget: THINKING_BUDGET },
     },
   };
 

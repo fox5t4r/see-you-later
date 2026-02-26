@@ -3,16 +3,34 @@ import type { HistoryItem } from '@/types';
 const NOTION_API_URL = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 
+/**
+ * Notion에 요약 페이지를 생성합니다.
+ * notionPageId는 데이터베이스 ID 또는 일반 페이지 ID 모두 허용합니다.
+ * 속성(컬럼) 설정 없이 제목과 본문 블록만으로 저장하므로 별도 DB 설정이 불필요합니다.
+ */
 export async function exportToNotion(
   item: HistoryItem,
   token: string,
-  databaseId: string
+  notionPageId: string,
 ): Promise<string> {
-  const result = item.result;
-  const isLearn = result.mode === 'learn';
+  const cleanId = notionPageId.replace(/-/g, '');
+  const isDatabase = await checkIsDatabase(cleanId, token);
 
-  // 요약 내용을 Notion 블록으로 변환
+  const parent = isDatabase
+    ? { database_id: cleanId }
+    : { page_id: cleanId };
+
   const contentBlocks = buildNotionBlocks(item);
+
+  const body: Record<string, unknown> = {
+    parent,
+    properties: {
+      title: {
+        title: [{ text: { content: item.title.slice(0, 2000) } }],
+      },
+    },
+    children: contentBlocks,
+  };
 
   const response = await fetch(`${NOTION_API_URL}/pages`, {
     method: 'POST',
@@ -21,39 +39,50 @@ export async function exportToNotion(
       'Content-Type': 'application/json',
       'Notion-Version': NOTION_VERSION,
     },
-    body: JSON.stringify({
-      parent: { database_id: databaseId },
-      properties: {
-        title: {
-          title: [{ text: { content: item.title } }],
-        },
-        URL: { url: item.url },
-        타입: {
-          select: { name: item.contentType === 'youtube' ? '유튜브' : '웹 페이지' },
-        },
-        모드: {
-          select: { name: isLearn ? '학습 모드' : '일반 모드' },
-        },
-        추천도: {
-          number: result.recommendation.score,
-        },
-        저장일: {
-          date: { start: new Date(item.createdAt).toISOString() },
-        },
-      },
-      children: contentBlocks,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: '알 수 없는 오류' }));
+    const error = await response.json().catch(() => ({})) as { message?: string; code?: string };
+
+    if (response.status === 403 || error.code === 'restricted_resource') {
+      throw new Error(
+        'Notion 접근 권한이 없습니다.\n' +
+        '해당 페이지/데이터베이스에서 연동(Connections)에 See You Later Integration을 추가해주세요.',
+      );
+    }
+    if (response.status === 404) {
+      throw new Error(
+        'Notion 페이지를 찾을 수 없습니다.\n' +
+        '설정의 Page ID가 올바른지 확인해주세요.',
+      );
+    }
+
     throw new Error(
-      `Notion 저장 오류 (${response.status}): ${(error as { message?: string }).message ?? '요청 실패'}`
+      `Notion 저장 오류 (${response.status}): ${error.message ?? '요청 실패'}`,
     );
   }
 
   const page = await response.json() as { url?: string; id: string };
-  return page.url ?? `https://notion.so/${page.id}`;
+  return page.url ?? `https://notion.so/${page.id.replace(/-/g, '')}`;
+}
+
+async function checkIsDatabase(id: string, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${NOTION_API_URL}/databases/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Notion-Version': NOTION_VERSION,
+      },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function notionText(content: string, maxLen = 2000) {
+  return [{ text: { content: content.slice(0, maxLen) } }];
 }
 
 function buildNotionBlocks(item: HistoryItem) {
@@ -62,28 +91,34 @@ function buildNotionBlocks(item: HistoryItem) {
 
   const heading = (text: string, level: 1 | 2 | 3) => ({
     type: `heading_${level}`,
-    [`heading_${level}`]: {
-      rich_text: [{ text: { content: text } }],
-    },
+    [`heading_${level}`]: { rich_text: notionText(text) },
   });
 
   const paragraph = (text: string) => ({
     type: 'paragraph',
-    paragraph: { rich_text: [{ text: { content: text } }] },
+    paragraph: { rich_text: notionText(text) },
   });
 
   const bullet = (text: string) => ({
     type: 'bulleted_list_item',
-    bulleted_list_item: { rich_text: [{ text: { content: text } }] },
+    bulleted_list_item: { rich_text: notionText(text) },
   });
 
   const divider = () => ({ type: 'divider', divider: {} });
 
+  // 메타 정보
+  const typeLabel = item.contentType === 'youtube' ? '🎬 유튜브' : '📄 웹 페이지';
+  const modeLabel = result.mode === 'learn' ? '학습 모드' : '일반 모드';
+  const date = new Date(item.createdAt).toLocaleString('ko-KR');
+  const stars = '⭐'.repeat(result.recommendation.score);
+
+  blocks.push(paragraph(`${typeLabel} | ${modeLabel} | ${date}`));
+  blocks.push(paragraph(`🔗 ${item.url}`));
+  blocks.push(divider());
+
   // 추천도
   blocks.push(heading('추천도', 2));
-  const stars = '⭐'.repeat(result.recommendation.score);
-  blocks.push(paragraph(`${stars} (${result.recommendation.score}/5)`));
-  blocks.push(paragraph(`📌 ${result.recommendation.reason}`));
+  blocks.push(paragraph(`${stars} (${result.recommendation.score}/5)  ${result.recommendation.reason}`));
   blocks.push(paragraph(`✅ 추천 대상: ${result.recommendation.bestFor}`));
   blocks.push(paragraph(`⏭️ 스킵 대상: ${result.recommendation.skipIf}`));
   blocks.push(divider());
@@ -101,11 +136,11 @@ function buildNotionBlocks(item: HistoryItem) {
     result.keyTakeaways.forEach((t) => blocks.push(bullet(t)));
     blocks.push(divider());
 
-    blocks.push(heading('배경 지식', 2));
-    blocks.push(paragraph(result.backgroundContext));
-
     blocks.push(heading('실제 적용', 2));
     blocks.push(paragraph(result.practicalApplication));
+
+    blocks.push(heading('배경 지식', 2));
+    blocks.push(paragraph(result.backgroundContext));
 
     if (result.furtherLearning) {
       blocks.push(heading('더 알아보기', 2));
@@ -117,15 +152,20 @@ function buildNotionBlocks(item: HistoryItem) {
     blocks.push(divider());
 
     blocks.push(heading('전체 요약', 2));
-    blocks.push(paragraph(result.fullSummary));
+    // Notion 블록 하나당 2000자 제한 — 긴 요약은 분할
+    const full = result.fullSummary;
+    const chunkSize = 1900;
+    for (let i = 0; i < full.length; i += chunkSize) {
+      blocks.push(paragraph(full.slice(i, i + chunkSize)));
+    }
   }
 
-  // 주요 타임스탬프 (유튜브)
   if ('keyMoments' in result && result.keyMoments && result.keyMoments.length > 0) {
     blocks.push(divider());
     blocks.push(heading('주요 타임스탬프', 2));
     result.keyMoments.forEach((m) => blocks.push(bullet(`[${m.timestamp}] ${m.description}`)));
   }
 
-  return blocks;
+  // Notion API는 한 번에 최대 100개 블록만 허용
+  return blocks.slice(0, 100);
 }

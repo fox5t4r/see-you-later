@@ -212,16 +212,28 @@ export default function SettingsView({ onSaved }: SettingsViewProps) {
             placeholder="secret_..."
             className="input-field font-mono text-xs"
           />
+          <p className="text-xs text-gray-400 mt-1">
+            <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              Integration 생성
+            </a>
+            {' '}후 Secret 키 입력
+          </p>
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-gray-600 mb-1 block">Database ID</span>
+          <span className="text-xs font-medium text-gray-600 mb-1 block">
+            Page ID
+            <span className="text-gray-400 font-normal"> (데이터베이스 또는 일반 페이지)</span>
+          </span>
           <input
             type="text"
             value={settings.notionDatabaseId ?? ''}
             onChange={(e) => update('notionDatabaseId', e.target.value)}
-            placeholder="32자리 ID"
+            placeholder="notion.so/... URL에서 32자리 ID 복사"
             className="input-field font-mono text-xs"
           />
+          <p className="text-xs text-gray-400 mt-1">
+            저장할 Notion 페이지를 열고 우측 상단 ··· → <strong>Connections</strong>에서 Integration 연결 후 URL의 마지막 32자리 입력
+          </p>
         </label>
       </section>
 

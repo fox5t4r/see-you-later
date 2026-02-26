@@ -1,65 +1,102 @@
 import type { HistoryItem } from '@/types';
 
+const SLACK_MAX_TEXT = 2900;
+
+function truncate(text: string, max = SLACK_MAX_TEXT): string {
+  return text.length > max ? text.slice(0, max) + '...' : text;
+}
+
 export async function exportToSlack(item: HistoryItem, webhookUrl: string): Promise<void> {
   const result = item.result;
   const stars = '⭐'.repeat(result.recommendation.score);
   const typeEmoji = item.contentType === 'youtube' ? '🎬' : '📄';
   const modeLabel = result.mode === 'learn' ? '학습 모드' : '일반 모드';
 
-  let summaryText = '';
+  const blocks: unknown[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `${typeEmoji} ${item.title}`.slice(0, 150),
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*모드:* ${modeLabel}` },
+        { type: 'mrkdwn', text: `*추천도:* ${stars} (${result.recommendation.score}/5)` },
+      ],
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*추천 이유:* ${result.recommendation.reason}` },
+    },
+    { type: 'divider' },
+  ];
+
   if (result.mode === 'learn') {
-    summaryText = result.keyTakeaways.map((t) => `• ${t}`).join('\n');
+    // 학습 모드: 핵심 개념 + 배울 점 + 실제 적용
+    const conceptLines = result.coreConcepts
+      .map((c) => `*${c.concept}*\n${c.explanation}`)
+      .join('\n\n');
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*핵심 개념:*\n${truncate(conceptLines)}` },
+    });
+
+    const takeaways = result.keyTakeaways.map((t) => `• ${t}`).join('\n');
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*배울 점:*\n${truncate(takeaways)}` },
+    });
+
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*실제 적용:*\n${truncate(result.practicalApplication)}` },
+    });
   } else {
-    summaryText = result.threeLineSummary.map((l) => `• ${l}`).join('\n');
+    // 일반 모드: 3줄 요약 + 전체 요약 모두 전송
+    const threeLine = result.threeLineSummary.map((l) => `• ${l}`).join('\n');
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*3줄 요약:*\n${threeLine}` },
+    });
+
+    blocks.push({ type: 'divider' });
+
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*전체 요약:*\n${truncate(result.fullSummary)}` },
+    });
   }
 
-  const message = {
-    blocks: [
+  // 유튜브 주요 타임스탬프
+  if ('keyMoments' in result && result.keyMoments && result.keyMoments.length > 0) {
+    const moments = result.keyMoments.map((m) => `• \`[${m.timestamp}]\` ${m.description}`).join('\n');
+    blocks.push({ type: 'divider' });
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*주요 타임스탬프:*\n${truncate(moments, 1500)}` },
+    });
+  }
+
+  blocks.push({
+    type: 'actions',
+    elements: [
       {
-        type: 'header',
-        text: {
-          type: 'plain_text',
-          text: `${typeEmoji} ${item.title}`,
-          emoji: true,
-        },
-      },
-      {
-        type: 'section',
-        fields: [
-          { type: 'mrkdwn', text: `*모드:* ${modeLabel}` },
-          { type: 'mrkdwn', text: `*추천도:* ${stars} (${result.recommendation.score}/5)` },
-        ],
-      },
-      {
-        type: 'section',
-        text: { type: 'mrkdwn', text: `*추천 이유:* ${result.recommendation.reason}` },
-      },
-      { type: 'divider' },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*핵심 내용:*\n${summaryText}`,
-        },
-      },
-      {
-        type: 'actions',
-        elements: [
-          {
-            type: 'button',
-            text: { type: 'plain_text', text: '원문 보기', emoji: true },
-            url: item.url,
-            action_id: 'view_original',
-          },
-        ],
+        type: 'button',
+        text: { type: 'plain_text', text: '원문 보기', emoji: true },
+        url: item.url,
+        action_id: 'view_original',
       },
     ],
-  };
+  });
 
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(message),
+    body: JSON.stringify({ blocks }),
   });
 
   if (!response.ok) {
