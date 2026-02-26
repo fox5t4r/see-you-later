@@ -41,8 +41,18 @@ jobs:
         with:
           files: see-you-later-${{ github.ref_name }}.zip
           body: |
-            ## 설치 방법
+            ## 🆕 ${{ github.ref_name }} 변경사항
+
+            ### ✨ 주요 변경
+            - **AI 모델 업그레이드**: Gemini 2.5 Pro → **Gemini 3 Flash Preview**
+              - 무료 요약 한도 **2.5배 증가** (100회/일 → 250회/일)
+              - 응답 속도 **약 3배 향상** — Watch Later 자동 요약 처리 빨라짐
+              - Thinking 파트 비활성화(`thinkingBudget=0`)로 응답 안정성 향상
+
+            ## 📦 설치 방법
             1. `see-you-later-${{ github.ref_name }}.zip` 다운로드 후 압축 해제
             2. `chrome://extensions` 접속
             3. 개발자 모드 활성화
             4. "압축 해제된 확장 프로그램을 로드합니다" 클릭 후 압축 해제된 폴더 선택
+
+            > 기존 버전에서 업그레이드 시 API 키 재입력 없이 바로 사용 가능합니다.
